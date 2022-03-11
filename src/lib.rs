@@ -1,3 +1,5 @@
+pub mod ui;
+
 use bevy::{
     ecs::schedule::ShouldRun, math::Mat2, prelude::*, render::camera::ScalingMode,
     window::WindowResized,
@@ -36,14 +38,12 @@ pub fn run() {
         .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
         .add_plugin(SvgPlugin)
-        .add_startup_system(setup.label("setup"))
+        .add_startup_system(ui::load_ui.label("setup"))
         .add_startup_system(load_field.label("load_field").after("setup"))
         .add_startup_system(resize.after("load_field"))
         .add_system(resize.with_run_criteria(resized))
         .run();
 }
-
-pub fn setup() {}
 
 pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
     log::info!("Setup");
@@ -177,10 +177,16 @@ fn resized(
 }
 
 fn resize(
-    mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize)>,
-    camera: Query<&OrthographicProjection>,
+    mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
+    mut graph_node: Query<&mut Style, With<ui::GraphNode>>,
+    camera: Query<&OrthographicProjection, Without<ui::UiCamera>>,
     windows: Res<Windows>,
 ) {
+    let height = windows.get_primary().unwrap().height() as f32;
+    if let Ok(mut style) = graph_node.get_single_mut() {
+        style.flex_basis = Val::Px(height);
+    }
+
     let camera = if let Ok(camera) = camera.get_single() {
         camera
     } else {
@@ -188,8 +194,7 @@ fn resize(
     };
 
     let scale = camera.scale;
-    let height = windows.get_primary().unwrap().height() as f32;
-    for (mut text, mut transform, size) in query.iter_mut() {
+    for (mut text, mut transform, size, _) in query.iter_mut() {
         for section in text.sections.iter_mut() {
             section.style.font_size = size.0 * height / (2.0 * scale);
         }
