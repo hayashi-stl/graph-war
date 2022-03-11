@@ -1,7 +1,11 @@
+use bevy::{
+    ecs::schedule::ShouldRun, math::Mat2, prelude::*, render::camera::ScalingMode,
+    window::WindowResized,
+};
+use bevy_svg::prelude::*;
+use std::iter;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
-use bevy::{prelude::*, render::camera::ScalingMode, math::Mat2, window::WindowResized, ecs::schedule::ShouldRun};
-use std::iter;
 
 #[cfg(target_family = "wasm")]
 #[macro_export]
@@ -29,16 +33,21 @@ pub fn run() {
     //wasm_logger::init(wasm_logger::Config::default());
 
     App::new()
+        .insert_resource(Msaa { samples: 4 })
         .add_plugins(DefaultPlugins)
+        .add_plugin(SvgPlugin)
         .add_startup_system(setup.label("setup"))
-        .add_startup_system(resize.after("setup"))
+        .add_startup_system(load_field.label("load_field").after("setup"))
+        .add_startup_system(resize.after("load_field"))
         .add_system(resize.with_run_criteria(resized))
         .run();
-
-    log::info!("Hello, world!");
 }
 
-pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn setup() {}
+
+pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
+    log::info!("Setup");
+
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
     let scale = 4.0;
@@ -54,7 +63,10 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         custom_size: Some(Vec2::new(2.0 * scale, AXIS_THICKNESS)),
         ..Default::default()
     };
-    let rot_90 = Transform::from_matrix(Mat4::from_mat3(Mat3::from_mat2(Mat2::from_cols_array(&[0.0, 1.0, -1.0, 0.0]))));
+    let rot_90 =
+        Transform::from_matrix(Mat4::from_mat3(Mat3::from_mat2(Mat2::from_cols_array(&[
+            0.0, 1.0, -1.0, 0.0,
+        ]))));
 
     // Axes
     commands.spawn_bundle(SpriteBundle {
@@ -77,7 +89,7 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let label_style = TextStyle {
         font: asset_server.load("NotoMono-Regular.ttf"),
         font_size: 0.0, // will be filled in by RelativeTextSize
-        color: Color::BLACK
+        color: Color::BLACK,
     };
     let label_alignment_x = TextAlignment {
         vertical: VerticalAlign::Top,
@@ -106,17 +118,46 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         for dir in [1.0, -1.0] {
             let dist = dist * dir;
             let pairs = [
-                (Transform::from_xyz(dist, -0.05, 1.0), label_alignment_x.clone()),
-                (Transform::from_xyz(-0.05, dist, 1.0), label_alignment_y.clone())
+                (
+                    Transform::from_xyz(dist, -0.05, 1.0),
+                    label_alignment_x.clone(),
+                ),
+                (
+                    Transform::from_xyz(-0.05, dist, 1.0),
+                    label_alignment_y.clone(),
+                ),
             ];
             for (transform, alignment) in pairs {
-                commands.spawn_bundle(Text2dBundle {
-                    text: Text::with_section(format!("{}", dist), label_style.clone(), alignment.clone()),
-                    transform,
-                    ..Default::default()
-                }).insert(RelativeTextSize(0.2));
+                commands
+                    .spawn_bundle(Text2dBundle {
+                        text: Text::with_section(
+                            format!("{}", dist),
+                            label_style.clone(),
+                            alignment.clone(),
+                        ),
+                        transform,
+                        ..Default::default()
+                    })
+                    .insert(RelativeTextSize(0.2));
             }
         }
+    }
+
+    for (i, pos) in [
+        [3.0, 3.0, 2.0],
+        [3.0, -3.0, 2.0],
+        [-3.0, -3.0, 2.0],
+        [-3.0, 3.0, 2.0],
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        commands.spawn_bundle(Svg2dBundle {
+            svg: asset_server.load(&format!("player{}.svg", i + 1)),
+            transform: Transform::from_translation(Vec3::from(pos))
+                .with_scale(Vec3::from([0.4; 3])),
+            ..Default::default()
+        });
     }
 }
 
@@ -124,18 +165,27 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 #[derive(Component)]
 pub struct RelativeTextSize(pub f32);
 
-fn resized(mut resize_events: EventReader<WindowResized>) -> ShouldRun {
-    if resize_events.iter().next().is_some() {
+fn resized(
+    mut resize_events: EventReader<WindowResized>,
+    new_cameras: Query<&OrthographicProjection, Added<OrthographicProjection>>,
+) -> ShouldRun {
+    if resize_events.iter().next().is_some() || !new_cameras.is_empty() {
         ShouldRun::Yes
     } else {
         ShouldRun::No
     }
 }
 
-fn resize(mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize)>, camera: Query<&OrthographicProjection>, windows: Res<Windows>) {
+fn resize(
+    mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize)>,
+    camera: Query<&OrthographicProjection>,
+    windows: Res<Windows>,
+) {
     let camera = if let Ok(camera) = camera.get_single() {
         camera
-    } else { return; };
+    } else {
+        return;
+    };
 
     let scale = camera.scale;
     let height = windows.get_primary().unwrap().height() as f32;

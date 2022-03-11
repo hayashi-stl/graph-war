@@ -17,6 +17,7 @@ opt-level = 3
 [dependencies]
 log = "0.4"
 bevy = "0.6"
+bevy_svg = "0.6"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 flexi_logger = "0.22"
