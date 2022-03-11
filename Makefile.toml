@@ -1,0 +1,22 @@
+[env.development]
+BUILD_MODE = "--debug"
+RUN_MODE = ""
+
+[env.production]
+BUILD_MODE = "--release"
+RUN_MODE = "--release"
+
+[tasks.build]
+clear = true
+script = ["cargo build ${BUILD_MODE} ${@}"]
+
+[tasks.run]
+clear = true
+script = ["cargo run ${RUN_MODE} ${@}"]
+
+[tasks.wasm]
+script = ["wasm-pack build ${BUILD_MODE} --target web"]
+
+[tasks.default]
+clear = true
+dependencies = ["build"]
