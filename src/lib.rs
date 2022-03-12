@@ -1,9 +1,12 @@
+pub mod graph;
 pub mod ui;
 
 use bevy::{
     ecs::schedule::ShouldRun, math::Mat2, prelude::*, render::camera::ScalingMode,
     window::WindowResized,
 };
+use bevy_egui::EguiPlugin;
+use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_svg::prelude::*;
 use std::iter;
 #[cfg(target_family = "wasm")]
@@ -24,6 +27,10 @@ extern "C" {
     fn log(s: &str);
 }
 
+/// Owned by some player with the stored player index
+#[derive(Component)]
+pub struct Owner(pub u32);
+
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 
 pub fn run() {
@@ -36,18 +43,28 @@ pub fn run() {
 
     App::new()
         .insert_resource(Msaa { samples: 4 })
+        .insert_resource(ui::IdLender::default())
         .add_plugins(DefaultPlugins)
+        //.add_plugin(WorldInspectorPlugin::new())
+        //.register_inspectable::<ui::EguiId>()
         .add_plugin(SvgPlugin)
+        .add_plugin(EguiPlugin)
+        .add_event::<graph::FireFunction>()
+        .add_startup_system(ui::setup_egui)
         .add_startup_system(ui::load_ui.label("setup"))
         .add_startup_system(load_field.label("load_field").after("setup"))
         .add_startup_system(resize.after("load_field"))
         .add_system(resize.with_run_criteria(resized))
+        .add_system(ui::update_textboxes)
+        .add_system_to_stage(CoreStage::PreUpdate, ui::update_buttons)
+        .add_system(ui::update_fire_buttons.label("fire_buttons"))
+        .add_system(graph::handle_fire_events.after("fire_buttons"))
+        .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
+        .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
         .run();
 }
 
 pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
-    log::info!("Setup");
-
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
     let scale = 4.0;
@@ -144,20 +161,22 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     for (i, pos) in [
+        [-3.0, 3.0, 2.0],
+        [-3.0, -3.0, 2.0],
         [3.0, 3.0, 2.0],
         [3.0, -3.0, 2.0],
-        [-3.0, -3.0, 2.0],
-        [-3.0, 3.0, 2.0],
     ]
     .into_iter()
     .enumerate()
     {
-        commands.spawn_bundle(Svg2dBundle {
-            svg: asset_server.load(&format!("player{}.svg", i + 1)),
-            transform: Transform::from_translation(Vec3::from(pos))
-                .with_scale(Vec3::from([0.4; 3])),
-            ..Default::default()
-        });
+        commands
+            .spawn_bundle(Svg2dBundle {
+                svg: asset_server.load(&format!("player{}.svg", i + 1)),
+                transform: Transform::from_translation(Vec3::from(pos))
+                    .with_scale(Vec3::from([0.4; 3])),
+                ..Default::default()
+            })
+            .insert(Owner(i as u32));
     }
 }
 
@@ -178,13 +197,13 @@ fn resized(
 
 fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
-    mut graph_node: Query<&mut Style, With<ui::GraphNode>>,
+    mut graph_node: Query<(&mut Style, With<ui::GraphNode>)>,
     camera: Query<&OrthographicProjection, Without<ui::UiCamera>>,
     windows: Res<Windows>,
 ) {
     let height = windows.get_primary().unwrap().height() as f32;
-    if let Ok(mut style) = graph_node.get_single_mut() {
-        style.flex_basis = Val::Px(height);
+    for (mut style, _) in graph_node.iter_mut() {
+        style.flex_basis = Val::Px(height / 2.0);
     }
 
     let camera = if let Ok(camera) = camera.get_single() {
