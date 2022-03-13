@@ -50,11 +50,31 @@ def_call_1_fns! {
     pub enum Call1 {
         Sin("sin") => f64::sin,
         Cos("cos") => f64::cos,
+        Tan("tan") => f64::tan,
+        Asin("asin") => f64::asin,
+        Acos("acos") => f64::acos,
+        Atan("atan") => f64::atan,
+        Sinh("sinh") => f64::sinh,
+        Cosh("cosh") => f64::cosh,
+        Tanh("tanh") => f64::tanh,
+        Asinh("asinh") => f64::asinh,
+        Acosh("acosh") => f64::acosh,
+        Atanh("atanh") => f64::atanh,
+        Ln("ln") => f64::ln,
+        Log2("log2") => f64::log2,
+        Log10("log10") => f64::log10,
+        Sqrt("sqrt") => f64::sqrt,
+        Cbrt("cbrt") => f64::cbrt,
+        Abs("abs") => f64::abs,
+        Sign("sign") => f64::signum,
+        Floor("floor") => f64::floor,
+        Ceil("ceil") => f64::ceil,
+        Fract("fract") => f64::fract,
     }
 
     static CALL_1_FN_MAP: Lazy<FxHashMap<&str, Call1>>;
 
-    const CALL_1_FNS: [fn(f64) -> f64; 2];
+    const CALL_1_FNS: [fn(f64) -> f64; 22];
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
