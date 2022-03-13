@@ -50,7 +50,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
         let button_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 33.0,
+            font_size: 28.0,
             color: Color::BLACK,
         };
 
@@ -74,7 +74,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
             node.spawn_bundle(TextBundle {
                 text: Text::with_section(
-                    format!("P{}: Enter functions\nin terms of t", player_index + 1),
+                    format!("P{}: Enter functions in terms of t (0 ≤ t ≤ 1)", player_index + 1),
                     function_label_style.clone(),
                     center_align.clone(),
                 ),
@@ -116,7 +116,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                             flex_basis: Val::Percent(100.0),
                             flex_grow: 1.0,
                             flex_shrink: 1.0,
-                            min_size: Size::new(Val::Px(0.0), Val::Px(30.0)),
+                            min_size: Size::new(Val::Px(0.0), Val::Px(25.0)),
                             margin: Rect::all(Val::Px(4.0)),
                             ..Default::default()
                         },
@@ -130,19 +130,6 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(EguiId::default());
                 });
             }
-
-            node.spawn_bundle(TextBundle {
-                text: Text::with_section(
-                    "0 ≤ t ≤ 1",
-                    function_label_style.clone(),
-                    center_align.clone(),
-                ),
-                style: Style {
-                    align_self: AlignSelf::Center,
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
 
             node.spawn_bundle(ButtonBundle {
                 style: Style {
@@ -181,67 +168,66 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn_bundle(UiCameraBundle::default())
         .insert(UiCamera);
 
-    for i in 0..2 {
-        // Split the UI in half so the field is forced to be centered.
-        commands
-            .spawn_bundle(NodeBundle {
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::RowReverse,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    bottom: Val::Percent(0.0),
+                    left: Val::Percent(0.0),
+                    ..Default::default()
+                },
+                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                min_size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                max_size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                align_items: AlignItems::Stretch,
+                ..Default::default()
+            },
+            color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+            ..Default::default()
+        })
+        .with_children(|node| {
+            // Half of field (no nodes)
+            node.spawn_bundle(NodeBundle {
                 style: Style {
-                    flex_direction: [FlexDirection::RowReverse, FlexDirection::Row][i],
-                    position_type: PositionType::Absolute,
-                    position: Rect {
-                        bottom: Val::Percent(0.0),
-                        left: Val::Percent(i as f32 * 50.0),
-                        ..Default::default()
-                    },
-                    size: Size::new(Val::Percent(50.0), Val::Percent(100.0)),
-                    min_size: Size::new(Val::Percent(50.0), Val::Percent(100.0)),
-                    max_size: Size::new(Val::Percent(50.0), Val::Percent(100.0)),
-                    align_items: AlignItems::Stretch,
+                    flex_basis: Val::Px(720.0),
+                    flex_grow: 0.0,
+                    flex_shrink: 0.0,
                     ..Default::default()
                 },
                 color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
                 ..Default::default()
             })
-            .with_children(|node| {
-                // Half of field (no nodes)
-                node.spawn_bundle(NodeBundle {
-                    style: Style {
-                        flex_basis: Val::Px(360.0),
-                        flex_grow: 0.0,
-                        flex_shrink: 0.0,
-                        ..Default::default()
-                    },
-                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
-                    ..Default::default()
-                })
-                .insert(GraphNode);
+            .insert(GraphNode);
 
-                // Function entry
-                node.spawn_bundle(NodeBundle {
-                    style: Style {
-                        flex_direction: FlexDirection::ColumnReverse,
-                        align_items: AlignItems::Stretch,
-                        flex_basis: Val::Percent(100.0),
-                        flex_grow: 1.0,
-                        flex_shrink: 1.0,
-                        overflow: Overflow::Hidden,
-                        ..Default::default()
-                    },
-                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+            // Function entry
+            node.spawn_bundle(NodeBundle {
+                style: Style {
+                    flex_direction: FlexDirection::ColumnReverse,
+                    align_items: AlignItems::Stretch,
+                    flex_basis: Val::Percent(100.0),
+                    flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    overflow: Overflow::Hidden,
                     ..Default::default()
-                })
-                .spawn_function_ui(&asset_server, [0, 2][i])
-                .spawn_function_ui(&asset_server, [1, 3][i]);
-            });
-    }
+                },
+                color: UiColor(Color::rgba(0.65, 0.65, 0.65, 1.0)),
+                ..Default::default()
+            })
+            .spawn_function_ui(&asset_server, 0)
+            .spawn_function_ui(&asset_server, 1)
+            .spawn_function_ui(&asset_server, 2)
+            .spawn_function_ui(&asset_server, 3);
+        });
 }
 
 #[derive(Component)]
 pub struct FireButton;
 
-const NORMAL_BUTTON: Color = Color::rgb(0.75, 0.75, 0.75);
-const HOVERED_BUTTON: Color = Color::rgb(0.65, 0.65, 0.65);
-const PRESSED_BUTTON: Color = Color::rgb(0.55, 0.55, 0.55);
+const NORMAL_BUTTON: Color = Color::rgb(0.85, 0.85, 0.85);
+const HOVERED_BUTTON: Color = Color::rgb(0.80, 0.80, 0.80);
+const PRESSED_BUTTON: Color = Color::rgb(0.75, 0.75, 0.75);
 
 pub fn update_buttons(
     mut buttons: Query<(&Interaction, &mut UiColor), (Changed<Interaction>, With<Button>)>,
@@ -281,14 +267,6 @@ pub fn setup_egui(mut egui_ctx: ResMut<EguiContext>) {
     style.visuals = egui::Visuals::light();
     style.visuals.extreme_bg_color = egui::Color32::LIGHT_GRAY;
     egui_ctx.ctx_mut().set_style(style);
-
-    let mut fonts = egui::FontDefinitions::default();
-    fonts
-        .family_and_size
-        .get_mut(&egui::TextStyle::Monospace)
-        .unwrap()
-        .1 = 20.0;
-    egui_ctx.ctx_mut().set_fonts(fonts);
 }
 
 /// Labels entities that should get an egui textbox.
@@ -322,7 +300,10 @@ pub fn update_textboxes(
                 ui.add_sized(
                     ui.available_size(),
                     egui::TextEdit::singleline(&mut textbox.0)
-                        .text_style(egui::TextStyle::Monospace),
+                        .font(egui::FontId{
+                            family: egui::FontFamily::Monospace,
+                            size: 20.0,
+                        }),
                 )
             });
     }

@@ -75,11 +75,11 @@ pub fn run() {
 pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
-    let scale = 4.0;
     let cell_size = 1.0;
+    let scale = 4.0;
 
     let mut camera = OrthographicCameraBundle::new_2d();
-    camera.orthographic_projection.scaling_mode = ScalingMode::FixedVertical;
+    camera.orthographic_projection.scaling_mode = ScalingMode::None;
     camera.orthographic_projection.scale = scale;
     commands.spawn_bundle(camera);
 
@@ -207,21 +207,28 @@ fn resized(
 fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
     mut graph_node: Query<(&mut Style, With<ui::GraphNode>)>,
-    camera: Query<&OrthographicProjection, Without<ui::UiCamera>>,
+    mut camera: Query<&mut OrthographicProjection, Without<ui::UiCamera>>,
     windows: Res<Windows>,
 ) {
+    let width = windows.get_primary().unwrap().width() as f32;
     let height = windows.get_primary().unwrap().height() as f32;
     for (mut style, _) in graph_node.iter_mut() {
-        style.flex_basis = Val::Px(height / 2.0);
+        style.flex_basis = Val::Px(height);
     }
 
-    let camera = if let Ok(camera) = camera.get_single() {
+    let mut camera = if let Ok(camera) = camera.get_single_mut() {
         camera
     } else {
         return;
     };
 
     let scale = camera.scale;
+    let aspect_ratio = width / height;
+    camera.left = 1.0 - 2.0 * aspect_ratio;
+    camera.right = 1.0;
+    camera.top = 1.0;
+    camera.bottom = -1.0;
+
     for (mut text, mut transform, size, _) in query.iter_mut() {
         for section in text.sections.iter_mut() {
             section.style.font_size = size.0 * height / (2.0 * scale);

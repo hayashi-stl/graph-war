@@ -107,13 +107,6 @@ pub fn handle_fire_events(
             .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
             .unwrap();
 
-        log::info!(
-            "Player {} fired:\n    x(t)={}\n    y(t)={}",
-            player + 1,
-            fx,
-            fy
-        );
-
         let mut funcs = Vec::with_capacity(2);
 
         for (axis, func) in [("x", fx), ("y", fy)] {
