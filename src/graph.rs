@@ -3,8 +3,9 @@ use bevy_svg::prelude::Svg2dBundle;
 use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
 use pest::{
+    error::{Error, ErrorVariant},
     iterators::{Pair, Pairs},
-    Parser, error::{Error, ErrorVariant},
+    Parser,
 };
 use std::{iter, time::Duration};
 
@@ -96,11 +97,15 @@ impl Call2 {
     }
 }
 
-static CONSTS: Lazy<FxHashMap<&str, f64>> = Lazy::new(|| [
-    ("tau", std::f64::consts::TAU),
-    ("pi", std::f64::consts::PI),
-    ("e", std::f64::consts::E),
-].into_iter().collect());
+static CONSTS: Lazy<FxHashMap<&str, f64>> = Lazy::new(|| {
+    [
+        ("tau", std::f64::consts::TAU),
+        ("pi", std::f64::consts::PI),
+        ("e", std::f64::consts::E),
+    ]
+    .into_iter()
+    .collect()
+});
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
@@ -147,10 +152,15 @@ impl Function {
                     .chain(pair_vec.chunks(2).map(|pairs| {
                         let op_sign = &pairs[0];
                         let expr = pairs[1].clone();
-                        Self::from_pair(expr).map(|f| (
-                            f,
-                            signs.iter().find_map(|(sign, op)| (*sign == op_sign.as_str()).then(|| *op)).unwrap(),
-                        ))
+                        Self::from_pair(expr).map(|f| {
+                            (
+                                f,
+                                signs
+                                    .iter()
+                                    .find_map(|(sign, op)| (*sign == op_sign.as_str()).then(|| *op))
+                                    .unwrap(),
+                            )
+                        })
                     }))
                     .collect::<Result<_, _>>()?,
             ))
@@ -159,12 +169,18 @@ impl Function {
         }
     }
 
-    fn from_op_sequence(pair: Pair<Rule>, variant: impl Fn(Vec<Function>) -> Self) -> Result<Self, Error<Rule>> {
+    fn from_op_sequence(
+        pair: Pair<Rule>,
+        variant: impl Fn(Vec<Function>) -> Self,
+    ) -> Result<Self, Error<Rule>> {
         let mut inner = pair.into_inner();
         let first = inner.next().unwrap();
         if inner.peek().is_some() {
             Ok(variant(
-                iter::once(first).chain(inner).map(Self::from_pair).collect::<Result<_, _>>()?
+                iter::once(first)
+                    .chain(inner)
+                    .map(Self::from_pair)
+                    .collect::<Result<_, _>>()?,
             ))
         } else {
             Self::from_pair(first)
@@ -174,10 +190,21 @@ impl Function {
     fn from_pair(pair: Pair<Rule>) -> Result<Self, Error<Rule>> {
         match pair.as_rule() {
             Rule::expr => Self::from_pair(pair.into_inner().next().unwrap()),
-            Rule::add => Self::from_multi_op_sequence(pair, Self::Add,
-                &[("+", OpType::Normal), ("-", OpType::Inverse)]),
-            Rule::mul => Self::from_multi_op_sequence(pair, Self::Mul,
-                &[("*", OpType::Normal), ("/", OpType::Inverse), ("//", OpType::Third), ("%", OpType::Fourth)]),
+            Rule::add => Self::from_multi_op_sequence(
+                pair,
+                Self::Add,
+                &[("+", OpType::Normal), ("-", OpType::Inverse)],
+            ),
+            Rule::mul => Self::from_multi_op_sequence(
+                pair,
+                Self::Mul,
+                &[
+                    ("*", OpType::Normal),
+                    ("/", OpType::Inverse),
+                    ("//", OpType::Third),
+                    ("%", OpType::Fourth),
+                ],
+            ),
             Rule::neg => {
                 let negate = pair.as_str().starts_with("-");
                 let expr = Self::from_pair(pair.into_inner().next().unwrap())?;
@@ -195,9 +222,12 @@ impl Function {
                 if let Some(call) = CALL_1_FN_MAP.get(func.as_str()) {
                     Ok(Self::Call1(*call, Box::new(Self::from_pair(expr)?)))
                 } else {
-                    Err(Error::new_from_span(ErrorVariant::CustomError {
-                        message: format!("unknown unary function: {}", func.as_str())
-                    }, func.as_span()))
+                    Err(Error::new_from_span(
+                        ErrorVariant::CustomError {
+                            message: format!("unknown unary function: {}", func.as_str()),
+                        },
+                        func.as_span(),
+                    ))
                 }
             }
             Rule::call_2 => {
@@ -206,11 +236,17 @@ impl Function {
                 let expr1 = pairs.next().unwrap();
                 let expr2 = pairs.next().unwrap();
                 if let Some(call) = CALL_2_FN_MAP.get(func.as_str()) {
-                    Ok(Self::Call2(*call, Box::new([Self::from_pair(expr1)?, Self::from_pair(expr2)?])))
+                    Ok(Self::Call2(
+                        *call,
+                        Box::new([Self::from_pair(expr1)?, Self::from_pair(expr2)?]),
+                    ))
                 } else {
-                    Err(Error::new_from_span(ErrorVariant::CustomError {
-                        message: format!("unknown binary function: {}", func.as_str())
-                    }, func.as_span()))
+                    Err(Error::new_from_span(
+                        ErrorVariant::CustomError {
+                            message: format!("unknown binary function: {}", func.as_str()),
+                        },
+                        func.as_span(),
+                    ))
                 }
             }
             Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
@@ -221,11 +257,14 @@ impl Function {
                 } else if pair.as_str() == "t" {
                     Ok(Self::Var)
                 } else {
-                    Err(Error::new_from_span(ErrorVariant::CustomError {
-                        message: format!("unknown variable: {}", pair.as_str())
-                    }, pair.as_span()))
+                    Err(Error::new_from_span(
+                        ErrorVariant::CustomError {
+                            message: format!("unknown variable: {}", pair.as_str()),
+                        },
+                        pair.as_span(),
+                    ))
                 }
-            },
+            }
             Rule::constant => Ok(Self::Const(str::parse(pair.as_str()).unwrap())),
 
             _ => unreachable!(),
@@ -236,24 +275,18 @@ impl Function {
         match self {
             Self::Var => t,
             Self::Const(c) => *c,
-            Self::Add(fs) => fs.iter().fold(0.0, |acc, (f, op)| {
-                match *op {
-                    OpType::Normal => acc + f.eval(t),
-                    OpType::Inverse => acc - f.eval(t),
-                    _ => unreachable!(),
-                }
+            Self::Add(fs) => fs.iter().fold(0.0, |acc, (f, op)| match *op {
+                OpType::Normal => acc + f.eval(t),
+                OpType::Inverse => acc - f.eval(t),
+                _ => unreachable!(),
             }),
-            Self::Mul(fs) => fs.iter().fold(1.0, |acc, (f, op)| {
-                match *op {
-                    OpType::Normal => acc * f.eval(t),
-                    OpType::Inverse => acc / f.eval(t),
-                    OpType::Third => acc.div_euclid(f.eval(t)),
-                    OpType::Fourth => acc.rem_euclid(f.eval(t)),
-                }
+            Self::Mul(fs) => fs.iter().fold(1.0, |acc, (f, op)| match *op {
+                OpType::Normal => acc * f.eval(t),
+                OpType::Inverse => acc / f.eval(t),
+                OpType::Third => acc.div_euclid(f.eval(t)),
+                OpType::Fourth => acc.rem_euclid(f.eval(t)),
             }),
-            Self::Exp(fs) => fs.iter().rev().fold(1.0, |acc, f|
-                f.eval(t).powf(acc)
-            ),
+            Self::Exp(fs) => fs.iter().rev().fold(1.0, |acc, f| f.eval(t).powf(acc)),
             Self::Neg(f) => -f.eval(t),
             Self::Call1(call, f) => call.call(f.eval(t)),
             Self::Call2(call, fs) => call.call(fs[0].eval(t), fs[1].eval(t)),
@@ -368,7 +401,8 @@ pub fn move_rockets(
         let next_pos = Vec2::new(x as f32, y as f32) + offset.0;
         let curr_pos = transform.translation.xy();
         if next_pos - curr_pos != Vec2::ZERO {
-            transform.rotation = Quat::from_rotation_arc_2d(Vec2::X, (next_pos - curr_pos).normalize());
+            transform.rotation =
+                Quat::from_rotation_arc_2d(Vec2::X, (next_pos - curr_pos).normalize());
         }
         transform.translation = next_pos.extend(3.0);
     }
