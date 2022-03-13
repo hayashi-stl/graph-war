@@ -6,7 +6,7 @@ use bevy_inspector_egui::Inspectable;
 use egui::Align2;
 use fxhash::FxHashMap;
 
-use crate::{graph::FireFunction, Owner};
+use crate::{graph::FireRocket, Owner};
 
 trait EntityCommandsExt {
     fn spawn_function_ui(
@@ -257,11 +257,11 @@ pub fn update_buttons(
 
 pub fn update_fire_buttons(
     buttons: Query<(&Interaction, &Owner), (Changed<Interaction>, With<FireButton>)>,
-    mut fire_events: EventWriter<FireFunction>,
+    mut fire_events: EventWriter<FireRocket>,
 ) {
     for (interaction, owner) in buttons.iter() {
         if *interaction == Interaction::Clicked {
-            fire_events.send(FireFunction {
+            fire_events.send(FireRocket {
                 player_index: owner.0,
             });
         }

@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate pest_derive;
+
 pub mod graph;
 pub mod ui;
 
@@ -31,6 +34,10 @@ extern "C" {
 #[derive(Component)]
 pub struct Owner(pub u32);
 
+/// Labels a player
+#[derive(Component)]
+pub struct Player;
+
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 
 pub fn run() {
@@ -49,7 +56,7 @@ pub fn run() {
         //.register_inspectable::<ui::EguiId>()
         .add_plugin(SvgPlugin)
         .add_plugin(EguiPlugin)
-        .add_event::<graph::FireFunction>()
+        .add_event::<graph::FireRocket>()
         .add_startup_system(ui::setup_egui)
         .add_startup_system(ui::load_ui.label("setup"))
         .add_startup_system(load_field.label("load_field").after("setup"))
@@ -61,6 +68,7 @@ pub fn run() {
         .add_system(graph::handle_fire_events.after("fire_buttons"))
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
+        .add_system(graph::move_rockets)
         .run();
 }
 
@@ -176,7 +184,8 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
                     .with_scale(Vec3::from([0.4; 3])),
                 ..Default::default()
             })
-            .insert(Owner(i as u32));
+            .insert(Owner(i as u32))
+            .insert(Player);
     }
 }
 

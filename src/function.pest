@@ -1,0 +1,8 @@
+func = { SOI ~ expr ~ EOI }
+expr = { add }
+add = { primary ~ ("+" ~ primary)* }
+primary = { var | constant | "(" ~ expr ~ ")" }
+var = { "t" }
+constant = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+WHITESPACE = _{ " " }
