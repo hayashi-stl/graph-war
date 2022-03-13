@@ -8,11 +8,11 @@ primary = { call_2 | call_1 | primitive }
 primitive = { var | constant | "(" ~ expr ~ ")" }
 call_1 = { name ~ primitive }
 call_2 = { name ~ primitive ~ primitive }
-var = { "t" }
+var = { name }
 constant = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
 name = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
-mul_sign = { "*" | "/" }
+mul_sign = { "*" | "//" | "/" | "%" }
 add_sign = { "+" | "-" }
 
 WHITESPACE = _{ " " }
