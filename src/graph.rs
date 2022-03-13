@@ -17,7 +17,7 @@ use crate::{
 #[grammar = "function.pest"]
 pub struct FunctionParser;
 
-macro_rules! def_call_1_fns {
+macro_rules! def_str_lookup {
     (
         $(#[$attr:meta])*
         pub enum $enum_name:ident {
@@ -31,12 +31,6 @@ macro_rules! def_call_1_fns {
             $($var),*
         }
 
-        impl $enum_name {
-            fn call(self, t: f64) -> f64 {
-                $arr[self as usize](t)
-            }
-        }
-
         static $set: $set_ty = once_cell::sync::Lazy::new(|| [
             $(($string, $enum_name::$var)),*
         ].into_iter().collect());
@@ -45,7 +39,7 @@ macro_rules! def_call_1_fns {
     };
 }
 
-def_call_1_fns! {
+def_str_lookup! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     pub enum Call1 {
         Sin("sin") => f64::sin,
@@ -77,6 +71,31 @@ def_call_1_fns! {
     const CALL_1_FNS: [fn(f64) -> f64; 22];
 }
 
+impl Call1 {
+    fn call(self, t: f64) -> f64 {
+        CALL_1_FNS[self as usize](t)
+    }
+}
+
+def_str_lookup! {
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub enum Call2 {
+        Min("min") => f64::min,
+        Max("max") => f64::max,
+        Atan2("atan2") => f64::atan2,
+    }
+
+    static CALL_2_FN_MAP: Lazy<FxHashMap<&str, Call2>>;
+
+    const CALL_2_FNS: [fn(f64, f64) -> f64; 3];
+}
+
+impl Call2 {
+    fn call(self, t1: f64, t2: f64) -> f64 {
+        CALL_2_FNS[self as usize](t1, t2)
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
     Normal,
@@ -92,6 +111,7 @@ pub enum Function {
     Exp(Vec<Function>),
     Neg(Box<Function>),
     Call1(Call1, Box<Function>),
+    Call2(Call2, Box<[Function; 2]>),
 }
 
 /// Labels a rocket
@@ -167,15 +187,29 @@ impl Function {
                 let mut pairs = pair.into_inner();
                 let func = pairs.next().unwrap();
                 let expr = pairs.next().unwrap();
-                if let Some(call1) = CALL_1_FN_MAP.get(func.as_str()) {
-                    Ok(Self::Call1(*call1, Box::new(Self::from_pair(expr)?)))
+                if let Some(call) = CALL_1_FN_MAP.get(func.as_str()) {
+                    Ok(Self::Call1(*call, Box::new(Self::from_pair(expr)?)))
                 } else {
                     Err(Error::new_from_span(ErrorVariant::CustomError {
-                        message: format!("unknown function: {}", func.as_str())
+                        message: format!("unknown unary function: {}", func.as_str())
+                    }, func.as_span()))
+                }
+            }
+            Rule::call_2 => {
+                let mut pairs = pair.into_inner();
+                let func = pairs.next().unwrap();
+                let expr1 = pairs.next().unwrap();
+                let expr2 = pairs.next().unwrap();
+                if let Some(call) = CALL_2_FN_MAP.get(func.as_str()) {
+                    Ok(Self::Call2(*call, Box::new([Self::from_pair(expr1)?, Self::from_pair(expr2)?])))
+                } else {
+                    Err(Error::new_from_span(ErrorVariant::CustomError {
+                        message: format!("unknown binary function: {}", func.as_str())
                     }, func.as_span()))
                 }
             }
             Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
+            Rule::primitive => Self::from_pair(pair.into_inner().next().unwrap()),
             Rule::var => Ok(Self::Var),
             Rule::constant => Ok(Self::Const(str::parse(pair.as_str()).unwrap())),
 
@@ -205,7 +239,8 @@ impl Function {
                 f.eval(t).powf(acc)
             ),
             Self::Neg(f) => -f.eval(t),
-            Self::Call1(call1, f) => call1.call(f.eval(t)),
+            Self::Call1(call, f) => call.call(f.eval(t)),
+            Self::Call2(call, fs) => call.call(fs[0].eval(t), fs[1].eval(t)),
         }
     }
 }

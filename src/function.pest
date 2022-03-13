@@ -4,8 +4,10 @@ add = { mul ~ (add_sign ~ mul)* }
 mul = { neg ~ (mul_sign ~ neg)* }
 neg = { "-"? ~ exp }
 exp = { primary ~ ("^" ~ primary )* }
-primary = { call_1 | var | constant | "(" ~ expr ~ ")" }
-call_1 = { name ~ primary }
+primary = { call_2 | call_1 | primitive }
+primitive = { var | constant | "(" ~ expr ~ ")" }
+call_1 = { name ~ primitive }
+call_2 = { name ~ primitive ~ primitive }
 var = { "t" }
 constant = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
