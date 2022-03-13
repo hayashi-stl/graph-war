@@ -1,8 +1,14 @@
 func = { SOI ~ expr ~ EOI }
 expr = { add }
-add = { primary ~ ("+" ~ primary)* }
+add = { mul ~ (add_sign ~ mul)* }
+mul = { neg ~ (mul_sign ~ neg)* }
+neg = { "-"? ~ exp }
+exp = { primary ~ ("^" ~ primary)* }
 primary = { var | constant | "(" ~ expr ~ ")" }
 var = { "t" }
 constant = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+mul_sign = { "*" | "/" }
+add_sign = { "+" | "-" }
 
 WHITESPACE = _{ " " }

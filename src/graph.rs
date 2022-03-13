@@ -15,11 +15,20 @@ use crate::{
 #[grammar = "function.pest"]
 pub struct FunctionParser;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum OpType {
+    Normal,
+    Inverse,
+}
+
 #[derive(Clone, Debug)]
 pub enum Function {
     Var,
     Const(f64),
-    Add(Vec<Function>),
+    Add(Vec<(Function, OpType)>),
+    Mul(Vec<(Function, OpType)>),
+    Exp(Vec<Function>),
+    Neg(Box<Function>),
 }
 
 /// Labels a rocket
@@ -33,29 +42,65 @@ const ROCKET_TIME: f64 = 5.0;
 pub struct Offset(Vec2);
 
 impl Function {
+    fn from_2_op_sequence(
+        pair: Pair<Rule>,
+        variant: impl Fn(Vec<(Function, OpType)>) -> Self,
+        normal_sign: &str,
+    ) -> Self {
+        let mut inner = pair.into_inner();
+        let first = inner.next().unwrap();
+        if inner.peek().is_some() {
+            let pair_vec = inner.collect::<Vec<_>>();
+            variant(
+                iter::once((Self::from_pair(first), OpType::Normal))
+                    .chain(pair_vec.chunks(2).map(|pairs| {
+                        let op_type = &pairs[0];
+                        let func = pairs[1].clone();
+                        (
+                            Self::from_pair(func),
+                            if op_type.as_str() == normal_sign {
+                                OpType::Normal
+                            } else {
+                                OpType::Inverse
+                            },
+                        )
+                    }))
+                    .collect(),
+            )
+        } else {
+            Self::from_pair(first)
+        }
+    }
+
+    fn from_op_sequence(pair: Pair<Rule>, variant: impl Fn(Vec<Function>) -> Self) -> Self {
+        let mut inner = pair.into_inner();
+        let first = inner.next().unwrap();
+        if inner.peek().is_some() {
+            variant(
+                iter::once(first).chain(inner).map(Self::from_pair).collect()
+            )
+        } else {
+            Self::from_pair(first)
+        }
+    }
+
     fn from_pair(pair: Pair<Rule>) -> Self {
         match pair.as_rule() {
             Rule::expr => Self::from_pair(pair.into_inner().next().unwrap()),
-
-            Rule::add => {
-                let mut inner = pair.into_inner();
-                let first = inner.next().unwrap();
-                if inner.peek().is_some() {
-                    Self::Add(
-                        iter::once(first)
-                            .chain(inner)
-                            .map(|p| Self::from_pair(p))
-                            .collect(),
-                    )
+            Rule::add => Self::from_2_op_sequence(pair, Self::Add, "+"),
+            Rule::mul => Self::from_2_op_sequence(pair, Self::Mul, "*"),
+            Rule::neg => {
+                let negate = pair.as_str().starts_with("-");
+                let func = Self::from_pair(pair.into_inner().next().unwrap());
+                if negate {
+                    Self::Neg(Box::new(func))
                 } else {
-                    Self::from_pair(first)
+                    func
                 }
             }
-
+            Rule::exp => Self::from_op_sequence(pair, Self::Exp),
             Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
-
             Rule::var => Self::Var,
-
             Rule::constant => Self::Const(str::parse(pair.as_str()).unwrap()),
 
             _ => unreachable!(),
@@ -66,7 +111,24 @@ impl Function {
         match self {
             Self::Var => t,
             Self::Const(c) => *c,
-            Self::Add(fs) => fs.iter().map(|f| f.eval(t)).sum::<f64>(),
+            Self::Add(fs) => fs.iter().fold(0.0, |acc, (f, op)| {
+                if *op == OpType::Normal {
+                    acc + f.eval(t)
+                } else {
+                    acc - f.eval(t)
+                }
+            }),
+            Self::Mul(fs) => fs.iter().fold(1.0, |acc, (f, op)| {
+                if *op == OpType::Normal {
+                    acc * f.eval(t)
+                } else {
+                    acc / f.eval(t)
+                }
+            }),
+            Self::Exp(fs) => fs.iter().rev().fold(1.0, |acc, f|
+                f.eval(t).powf(acc)
+            ),
+            Self::Neg(f) => -f.eval(t),
         }
     }
 }
@@ -126,6 +188,7 @@ pub fn handle_fire_events(
 
         let fy = funcs.pop().unwrap();
         let fx = funcs.pop().unwrap();
+        log::info!("{:#?}", fy);
         let start_x = fx.eval(0.0) as f32;
         let start_y = fy.eval(0.0) as f32;
 
