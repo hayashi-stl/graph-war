@@ -1,6 +1,9 @@
-use bevy::{prelude::*, math::Vec3Swizzles};
+use bevy::{math::Vec3Swizzles, prelude::*};
 use bevy_svg::prelude::Svg2dBundle;
-use pest::{Parser, iterators::{Pairs, Pair}};
+use pest::{
+    iterators::{Pair, Pairs},
+    Parser,
+};
 use std::{iter, time::Duration};
 
 use crate::{
@@ -32,31 +35,28 @@ pub struct Offset(Vec2);
 impl Function {
     fn from_pair(pair: Pair<Rule>) -> Self {
         match pair.as_rule() {
-            Rule::expr => {
-                Self::from_pair(pair.into_inner().next().unwrap())
-            }
+            Rule::expr => Self::from_pair(pair.into_inner().next().unwrap()),
 
             Rule::add => {
                 let mut inner = pair.into_inner();
                 let first = inner.next().unwrap();
                 if inner.peek().is_some() {
-                    Self::Add(iter::once(first).chain(inner).map(|p| Self::from_pair(p)).collect())
+                    Self::Add(
+                        iter::once(first)
+                            .chain(inner)
+                            .map(|p| Self::from_pair(p))
+                            .collect(),
+                    )
                 } else {
                     Self::from_pair(first)
                 }
             }
 
-            Rule::primary => {
-                Self::from_pair(pair.into_inner().next().unwrap())
-            }
+            Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
 
-            Rule::var => {
-                Self::Var
-            }
+            Rule::var => Self::Var,
 
-            Rule::constant => {
-                Self::Const(str::parse(pair.as_str()).unwrap())
-            }
+            Rule::constant => Self::Const(str::parse(pair.as_str()).unwrap()),
 
             _ => unreachable!(),
         }
@@ -129,26 +129,36 @@ pub fn handle_fire_events(
         let start_x = fx.eval(0.0) as f32;
         let start_y = fy.eval(0.0) as f32;
 
-        commands.spawn_bundle(Svg2dBundle {
-            svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
-            transform: (*transform).into(),
-            ..Default::default()
-        })
-        .insert(Parametric {
-            x: fx,
-            y: fy,
-        })
-        .insert(Offset(transform.translation.xy() - Vec2::new(start_x, start_y)))
-        .insert(Rocket)
-        .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
-        .insert(Owner(player));
+        commands
+            .spawn_bundle(Svg2dBundle {
+                svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
+                transform: (*transform).into(),
+                ..Default::default()
+            })
+            .insert(Parametric { x: fx, y: fy })
+            .insert(Offset(
+                transform.translation.xy() - Vec2::new(start_x, start_y),
+            ))
+            .insert(Rocket)
+            .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
+            .insert(Owner(player));
     }
 }
 
 pub fn move_rockets(
-    mut rockets: Query<(&Owner, &mut Transform, &Offset, &Parametric, &mut Timer, Entity), With<Rocket>>,
+    mut rockets: Query<
+        (
+            &Owner,
+            &mut Transform,
+            &Offset,
+            &Parametric,
+            &mut Timer,
+            Entity,
+        ),
+        With<Rocket>,
+    >,
     mut commands: Commands,
-    time: Res<Time>
+    time: Res<Time>,
 ) {
     for (owner, mut transform, offset, parametric, mut timer, entity) in rockets.iter_mut() {
         timer.tick(time.delta());

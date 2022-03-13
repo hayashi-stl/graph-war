@@ -74,7 +74,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
             node.spawn_bundle(TextBundle {
                 text: Text::with_section(
-                    format!("P{}: Enter functions in terms of t (0 ≤ t ≤ 1)", player_index + 1),
+                    format!(
+                        "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)",
+                        player_index + 1
+                    ),
                     function_label_style.clone(),
                     center_align.clone(),
                 ),
@@ -299,11 +302,10 @@ pub fn update_textboxes(
                 ui.set_height(size.size.y);
                 ui.add_sized(
                     ui.available_size(),
-                    egui::TextEdit::singleline(&mut textbox.0)
-                        .font(egui::FontId{
-                            family: egui::FontFamily::Monospace,
-                            size: 20.0,
-                        }),
+                    egui::TextEdit::singleline(&mut textbox.0).font(egui::FontId {
+                        family: egui::FontFamily::Monospace,
+                        size: 20.0,
+                    }),
                 )
             });
     }
