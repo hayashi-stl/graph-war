@@ -1,8 +1,10 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
 use bevy_svg::prelude::Svg2dBundle;
+use fxhash::FxHashMap;
+use once_cell::sync::Lazy;
 use pest::{
     iterators::{Pair, Pairs},
-    Parser,
+    Parser, error::{Error, ErrorVariant},
 };
 use std::{iter, time::Duration};
 
@@ -14,6 +16,46 @@ use crate::{
 #[derive(Parser)]
 #[grammar = "function.pest"]
 pub struct FunctionParser;
+
+macro_rules! def_call_1_fns {
+    (
+        $(#[$attr:meta])*
+        pub enum $enum_name:ident {
+            $($var:ident ( $string:tt ) => $func:expr),* $(,)?
+        }
+        static $set:ident: $set_ty:ty;
+        const $arr:ident: $arr_ty:ty;
+    ) => {
+        $(#[$attr])*
+        pub enum $enum_name {
+            $($var),*
+        }
+
+        impl $enum_name {
+            fn call(self, t: f64) -> f64 {
+                $arr[self as usize](t)
+            }
+        }
+
+        static $set: $set_ty = once_cell::sync::Lazy::new(|| [
+            $(($string, $enum_name::$var)),*
+        ].into_iter().collect());
+
+        const $arr: $arr_ty = [$($func),*];
+    };
+}
+
+def_call_1_fns! {
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub enum Call1 {
+        Sin("sin") => f64::sin,
+        Cos("cos") => f64::cos,
+    }
+
+    static CALL_1_FN_MAP: Lazy<FxHashMap<&str, Call1>>;
+
+    const CALL_1_FNS: [fn(f64) -> f64; 2];
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpType {
@@ -29,6 +71,7 @@ pub enum Function {
     Mul(Vec<(Function, OpType)>),
     Exp(Vec<Function>),
     Neg(Box<Function>),
+    Call1(Call1, Box<Function>),
 }
 
 /// Labels a rocket
@@ -46,62 +89,75 @@ impl Function {
         pair: Pair<Rule>,
         variant: impl Fn(Vec<(Function, OpType)>) -> Self,
         normal_sign: &str,
-    ) -> Self {
+    ) -> Result<Self, Error<Rule>> {
         let mut inner = pair.into_inner();
         let first = inner.next().unwrap();
         if inner.peek().is_some() {
             let pair_vec = inner.collect::<Vec<_>>();
-            variant(
-                iter::once((Self::from_pair(first), OpType::Normal))
+            Ok(variant(
+                iter::once(Self::from_pair(first).map(|f| (f, OpType::Normal)))
                     .chain(pair_vec.chunks(2).map(|pairs| {
                         let op_type = &pairs[0];
-                        let func = pairs[1].clone();
-                        (
-                            Self::from_pair(func),
+                        let expr = pairs[1].clone();
+                        Self::from_pair(expr).map(|f| (
+                            f,
                             if op_type.as_str() == normal_sign {
                                 OpType::Normal
                             } else {
                                 OpType::Inverse
                             },
-                        )
+                        ))
                     }))
+                    .flatten()
                     .collect(),
-            )
+            ))
         } else {
             Self::from_pair(first)
         }
     }
 
-    fn from_op_sequence(pair: Pair<Rule>, variant: impl Fn(Vec<Function>) -> Self) -> Self {
+    fn from_op_sequence(pair: Pair<Rule>, variant: impl Fn(Vec<Function>) -> Self) -> Result<Self, Error<Rule>> {
         let mut inner = pair.into_inner();
         let first = inner.next().unwrap();
         if inner.peek().is_some() {
-            variant(
-                iter::once(first).chain(inner).map(Self::from_pair).collect()
-            )
+            Ok(variant(
+                iter::once(first).chain(inner).map(Self::from_pair).flatten().collect()
+            ))
         } else {
             Self::from_pair(first)
         }
     }
 
-    fn from_pair(pair: Pair<Rule>) -> Self {
+    fn from_pair(pair: Pair<Rule>) -> Result<Self, Error<Rule>> {
         match pair.as_rule() {
             Rule::expr => Self::from_pair(pair.into_inner().next().unwrap()),
             Rule::add => Self::from_2_op_sequence(pair, Self::Add, "+"),
             Rule::mul => Self::from_2_op_sequence(pair, Self::Mul, "*"),
             Rule::neg => {
                 let negate = pair.as_str().starts_with("-");
-                let func = Self::from_pair(pair.into_inner().next().unwrap());
+                let expr = Self::from_pair(pair.into_inner().next().unwrap())?;
                 if negate {
-                    Self::Neg(Box::new(func))
+                    Ok(Self::Neg(Box::new(expr)))
                 } else {
-                    func
+                    Ok(expr)
                 }
             }
             Rule::exp => Self::from_op_sequence(pair, Self::Exp),
+            Rule::call_1 => {
+                let mut pairs = pair.into_inner();
+                let func = pairs.next().unwrap();
+                let expr = pairs.next().unwrap();
+                if let Some(call1) = CALL_1_FN_MAP.get(func.as_str()) {
+                    Ok(Self::Call1(*call1, Box::new(Self::from_pair(expr)?)))
+                } else {
+                    Err(Error::new_from_span(ErrorVariant::CustomError {
+                        message: format!("unknown function: {}", func.as_str())
+                    }, func.as_span()))
+                }
+            }
             Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
-            Rule::var => Self::Var,
-            Rule::constant => Self::Const(str::parse(pair.as_str()).unwrap()),
+            Rule::var => Ok(Self::Var),
+            Rule::constant => Ok(Self::Const(str::parse(pair.as_str()).unwrap())),
 
             _ => unreachable!(),
         }
@@ -129,6 +185,7 @@ impl Function {
                 f.eval(t).powf(acc)
             ),
             Self::Neg(f) => -f.eval(t),
+            Self::Call1(call1, f) => call1.call(f.eval(t)),
         }
     }
 }
@@ -176,7 +233,13 @@ pub fn handle_fire_events(
                 Ok(mut pairs) => {
                     let func = pairs.next().unwrap();
                     let expr = func.into_inner().next().unwrap();
-                    funcs.push(Function::from_pair(expr));
+                    match Function::from_pair(expr) {
+                        Ok(f) => funcs.push(f),
+                        Err(error) => {
+                            log::warn!("Error parsing {}(t): {}", axis, error);
+                            continue 'main;
+                        }
+                    }
                 }
 
                 Err(error) => {
@@ -188,7 +251,6 @@ pub fn handle_fire_events(
 
         let fy = funcs.pop().unwrap();
         let fx = funcs.pop().unwrap();
-        log::info!("{:#?}", fy);
         let start_x = fx.eval(0.0) as f32;
         let start_y = fy.eval(0.0) as f32;
 

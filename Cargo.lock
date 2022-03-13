@@ -1874,6 +1874,7 @@ dependencies = [
  "fxhash",
  "js-sys",
  "log",
+ "once_cell",
  "pest",
  "pest_derive",
  "wasm-bindgen",
