@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 #[macro_use]
 extern crate pest_derive;
 
@@ -145,11 +147,11 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
             let pairs = [
                 (
                     Transform::from_xyz(dist, -0.05, 1.0),
-                    label_alignment_x.clone(),
+                    label_alignment_x,
                 ),
                 (
                     Transform::from_xyz(-0.05, dist, 1.0),
-                    label_alignment_y.clone(),
+                    label_alignment_y,
                 ),
             ];
             for (transform, alignment) in pairs {
@@ -158,7 +160,7 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
                         text: Text::with_section(
                             format!("{}", dist),
                             label_style.clone(),
-                            alignment.clone(),
+                            alignment,
                         ),
                         transform,
                         ..Default::default()

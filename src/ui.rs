@@ -9,7 +9,15 @@ use fxhash::FxHashMap;
 use crate::{graph::FireRocket, Owner};
 
 trait EntityCommandsExt {
+    /// UI for inputting a function
     fn spawn_function_ui(
+        &mut self,
+        asset_server: &Res<AssetServer>,
+        player_index: u32,
+    ) -> &mut Self;
+
+    /// Shows what a player inputted
+    fn spawn_function_display(
         &mut self,
         asset_server: &Res<AssetServer>,
         player_index: u32,
@@ -28,6 +36,127 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     }
 
     fn spawn_function_ui(
+        &mut self,
+        asset_server: &Res<AssetServer>,
+        player_index: u32,
+    ) -> &mut Self {
+        let function_label_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 20.0,
+            color: Color::BLACK,
+        };
+        let center_align = TextAlignment {
+            horizontal: HorizontalAlign::Center,
+            vertical: VerticalAlign::Center,
+        };
+
+        let left_side_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 20.0,
+            color: Color::BLACK,
+        };
+
+        let button_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 28.0,
+            color: Color::BLACK,
+        };
+
+        self.with_children(|node| {
+            node.spawn_bundle(TextBundle {
+                text: Text::with_section(
+                    format!(
+                        "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)",
+                        player_index + 1
+                    ),
+                    function_label_style.clone(),
+                    center_align,
+                ),
+                style: Style {
+                    align_self: AlignSelf::Center,
+                    margin: Rect{ top: Val::Px(15.0), ..Default::default() },
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+            for axis in ["x", "y"] {
+                node.spawn_bundle(NodeBundle {
+                    style: Style {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Stretch,
+                        ..Default::default()
+                    },
+                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                    ..Default::default()
+                })
+                .with_children(|node| {
+                    node.spawn_bundle(TextBundle {
+                        text: Text::with_section(
+                            format!("{}(t)=", axis),
+                            left_side_style.clone(),
+                            center_align,
+                        ),
+                        style: Style {
+                            align_self: AlignSelf::Center,
+                            margin: Rect::all(Val::Px(4.0)),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    });
+
+                    // Textbox spot
+                    node.spawn_bundle(NodeBundle {
+                        style: Style {
+                            flex_basis: Val::Percent(100.0),
+                            flex_grow: 1.0,
+                            flex_shrink: 1.0,
+                            min_size: Size::new(Val::Px(0.0), Val::Px(25.0)),
+                            margin: Rect::all(Val::Px(4.0)),
+                            ..Default::default()
+                        },
+                        color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                        ..Default::default()
+                    })
+                    .insert(Owner(player_index))
+                    .insert(FunctionEntry)
+                    .maybe_insert((axis == "x").then(|| FunctionX))
+                    .maybe_insert((axis == "y").then(|| FunctionY))
+                    .insert(Textbox("".to_owned()))
+                    .insert(EguiId::default());
+                });
+            }
+
+            node.spawn_bundle(ButtonBundle {
+                style: Style {
+                    align_self: AlignSelf::Center,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    margin: Rect {
+                        top: Val::Px(6.0),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                color: UiColor(NORMAL_BUTTON),
+                ..Default::default()
+            })
+            .insert(FireButton)
+            .insert(Owner(player_index))
+            .with_children(|node| {
+                node.spawn_bundle(TextBundle {
+                    text: Text::with_section("Fire", button_style.clone(), center_align),
+                    style: Style {
+                        margin: Rect::all(Val::Px(4.0)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+            });
+        })
+    }
+
+    fn spawn_function_display(
         &mut self,
         asset_server: &Res<AssetServer>,
         player_index: u32,
@@ -75,11 +204,11 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             node.spawn_bundle(TextBundle {
                 text: Text::with_section(
                     format!(
-                        "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)",
+                        "P{}'s function: (0 ≤ t ≤ 1)",
                         player_index + 1
                     ),
                     function_label_style.clone(),
-                    center_align.clone(),
+                    center_align,
                 ),
                 style: Style {
                     align_self: AlignSelf::Center,
@@ -103,7 +232,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         text: Text::with_section(
                             format!("{}(t)=", axis),
                             left_side_style.clone(),
-                            center_align.clone(),
+                            center_align,
                         ),
                         style: Style {
                             align_self: AlignSelf::Center,
@@ -133,33 +262,6 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(EguiId::default());
                 });
             }
-
-            node.spawn_bundle(ButtonBundle {
-                style: Style {
-                    align_self: AlignSelf::Center,
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    margin: Rect {
-                        top: Val::Px(6.0),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                },
-                color: UiColor(NORMAL_BUTTON),
-                ..Default::default()
-            })
-            .insert(FireButton)
-            .insert(Owner(player_index))
-            .with_children(|node| {
-                node.spawn_bundle(TextBundle {
-                    text: Text::with_section("Fire", button_style.clone(), center_align.clone()),
-                    style: Style {
-                        margin: Rect::all(Val::Px(4.0)),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                });
-            });
 
             spawn_edge(node);
         })
@@ -204,6 +306,26 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             })
             .insert(GraphNode);
 
+            // Function display
+            node.spawn_bundle(NodeBundle {
+                style: Style {
+                    display: Display::None,
+                    flex_direction: FlexDirection::ColumnReverse,
+                    align_items: AlignItems::Stretch,
+                    flex_basis: Val::Percent(100.0),
+                    flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    overflow: Overflow::Hidden,
+                    ..Default::default()
+                },
+                color: UiColor(Color::rgba(0.65, 0.65, 0.65, 1.0)),
+                ..Default::default()
+            })
+            .spawn_function_display(&asset_server, 0)
+            .spawn_function_display(&asset_server, 1)
+            .spawn_function_display(&asset_server, 2)
+            .spawn_function_display(&asset_server, 3);
+
             // Function entry
             node.spawn_bundle(NodeBundle {
                 style: Style {
@@ -218,10 +340,7 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 color: UiColor(Color::rgba(0.65, 0.65, 0.65, 1.0)),
                 ..Default::default()
             })
-            .spawn_function_ui(&asset_server, 0)
-            .spawn_function_ui(&asset_server, 1)
-            .spawn_function_ui(&asset_server, 2)
-            .spawn_function_ui(&asset_server, 3);
+            .spawn_function_ui(&asset_server, 0);
         });
 }
 
@@ -277,6 +396,10 @@ pub fn setup_egui(mut egui_ctx: ResMut<EguiContext>) {
 #[derive(Component)]
 pub struct Textbox(pub String);
 
+/// Labels function entry textboxes
+#[derive(Component)]
+pub struct FunctionEntry;
+
 /// Labels x(t) textbox
 #[derive(Component)]
 pub struct FunctionX;
@@ -291,6 +414,8 @@ pub fn update_textboxes(
     windows: Res<Windows>,
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
+        if size.size.x == 0.0 && size.size.y == 0.0 { continue }
+
         let id = if let Some(id) = id.0 { id } else { continue };
         let left = transform.translation.x - size.size.x / 2.0;
         let bottom = transform.translation.y - size.size.y / 2.0;

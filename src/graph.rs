@@ -10,7 +10,7 @@ use pest::{
 use std::{iter, time::Duration};
 
 use crate::{
-    ui::{FunctionX, FunctionY, Textbox},
+    ui::{FunctionX, FunctionY, Textbox, FunctionEntry},
     Owner, Player,
 };
 
@@ -206,7 +206,7 @@ impl Function {
                 ],
             ),
             Rule::neg => {
-                let negate = pair.as_str().starts_with("-");
+                let negate = pair.as_str().starts_with('-');
                 let expr = Self::from_pair(pair.into_inner().next().unwrap())?;
                 if negate {
                     Ok(Self::Neg(Box::new(expr)))
@@ -307,8 +307,8 @@ pub struct FireRocket {
 }
 
 pub fn handle_fire_events(
-    function_x: Query<(&Owner, &Textbox), With<FunctionX>>,
-    function_y: Query<(&Owner, &Textbox), With<FunctionY>>,
+    function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
+    function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
     players: Query<(&Owner, &GlobalTransform), With<Player>>,
     mut fire_events: EventReader<FireRocket>,
     asset_server: Res<AssetServer>,
