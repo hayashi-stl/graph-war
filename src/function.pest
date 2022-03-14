@@ -11,6 +11,10 @@ call_2 = { name ~ primitive ~ primitive }
 var = { name }
 constant = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
 
+assigns = { SOI ~ ( assign ~ (assign_sep ~ assign)* | "" ) ~ assign_sep? ~ EOI }
+assign_sep = _{ NEWLINE+ }
+assign = { var ~ "=" ~ expr }
+
 name = @{ ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 mul_sign = { "*" | "//" | "/" | "%" }
 add_sign = { "+" | "-" }

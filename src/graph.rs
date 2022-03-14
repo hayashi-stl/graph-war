@@ -10,9 +10,36 @@ use pest::{
 use std::{iter, time::Duration};
 
 use crate::{
-    ui::{FunctionX, FunctionY, Textbox, FunctionEntry},
-    Owner, Player,
+    ui::{FunctionEntry, FunctionWhere, FunctionX, FunctionY, Textbox},
+    z, Owner, Player,
 };
+
+pub const QUICK_HELP: &str = r"
+Examples:
+x(t) = v                    x(t) = -2 * t
+y(t) = u^2                  y(t) = sin(3 * t)
+where u = 2 * t - 4         where
+      v = u + t * 0               <nothing>
+
+Operations:
+add (+), subtract (-), multiply (*), divide (/),
+floor divide (//), modulo (%), exponent (^)
+
+Unary functions (syntax: `sin a`):
+sin, cos, tan, asin, acos, atan,
+sinh, cosh, tanh, asinh, acosh, atanh,
+ln, log2, log10, sqrt, cbrt,
+abs, sign, floor, ceil, fract
+
+Binary functions (syntax: `min a b`):
+min, max, atan2
+
+Precedence (highest to lowest):
+function call
+^
+* / // %
++ -
+";
 
 #[derive(Parser)]
 #[grammar = "function.pest"]
@@ -117,7 +144,8 @@ pub enum OpType {
 
 #[derive(Clone, Debug)]
 pub enum Function {
-    Var,
+    /// If the option is None, the variable is `t`
+    Var(Option<usize>),
     Const(f64),
     Add(Vec<(Function, OpType)>),
     Mul(Vec<(Function, OpType)>),
@@ -142,17 +170,18 @@ impl Function {
         pair: Pair<Rule>,
         variant: impl Fn(Vec<(Function, OpType)>) -> Self,
         signs: &[(&str, OpType)],
+        var_map: &VarIndexMap,
     ) -> Result<Self, Error<Rule>> {
         let mut inner = pair.into_inner();
         let first = inner.next().unwrap();
         if inner.peek().is_some() {
             let pair_vec = inner.collect::<Vec<_>>();
             Ok(variant(
-                iter::once(Self::from_pair(first).map(|f| (f, OpType::Normal)))
+                iter::once(Self::from_pair(first, var_map).map(|f| (f, OpType::Normal)))
                     .chain(pair_vec.chunks(2).map(|pairs| {
                         let op_sign = &pairs[0];
                         let expr = pairs[1].clone();
-                        Self::from_pair(expr).map(|f| {
+                        Self::from_pair(expr, var_map).map(|f| {
                             (
                                 f,
                                 signs
@@ -165,13 +194,14 @@ impl Function {
                     .collect::<Result<_, _>>()?,
             ))
         } else {
-            Self::from_pair(first)
+            Self::from_pair(first, var_map)
         }
     }
 
     fn from_op_sequence(
         pair: Pair<Rule>,
         variant: impl Fn(Vec<Function>) -> Self,
+        var_map: &VarIndexMap,
     ) -> Result<Self, Error<Rule>> {
         let mut inner = pair.into_inner();
         let first = inner.next().unwrap();
@@ -179,21 +209,22 @@ impl Function {
             Ok(variant(
                 iter::once(first)
                     .chain(inner)
-                    .map(Self::from_pair)
+                    .map(|p| Self::from_pair(p, var_map))
                     .collect::<Result<_, _>>()?,
             ))
         } else {
-            Self::from_pair(first)
+            Self::from_pair(first, var_map)
         }
     }
 
-    fn from_pair(pair: Pair<Rule>) -> Result<Self, Error<Rule>> {
+    fn from_pair(pair: Pair<Rule>, var_map: &VarIndexMap) -> Result<Self, Error<Rule>> {
         match pair.as_rule() {
-            Rule::expr => Self::from_pair(pair.into_inner().next().unwrap()),
+            Rule::expr => Self::from_pair(pair.into_inner().next().unwrap(), var_map),
             Rule::add => Self::from_multi_op_sequence(
                 pair,
                 Self::Add,
                 &[("+", OpType::Normal), ("-", OpType::Inverse)],
+                var_map,
             ),
             Rule::mul => Self::from_multi_op_sequence(
                 pair,
@@ -204,23 +235,27 @@ impl Function {
                     ("//", OpType::Third),
                     ("%", OpType::Fourth),
                 ],
+                var_map,
             ),
             Rule::neg => {
                 let negate = pair.as_str().starts_with('-');
-                let expr = Self::from_pair(pair.into_inner().next().unwrap())?;
+                let expr = Self::from_pair(pair.into_inner().next().unwrap(), var_map)?;
                 if negate {
                     Ok(Self::Neg(Box::new(expr)))
                 } else {
                     Ok(expr)
                 }
             }
-            Rule::exp => Self::from_op_sequence(pair, Self::Exp),
+            Rule::exp => Self::from_op_sequence(pair, Self::Exp, var_map),
             Rule::call_1 => {
                 let mut pairs = pair.into_inner();
                 let func = pairs.next().unwrap();
                 let expr = pairs.next().unwrap();
                 if let Some(call) = CALL_1_FN_MAP.get(func.as_str()) {
-                    Ok(Self::Call1(*call, Box::new(Self::from_pair(expr)?)))
+                    Ok(Self::Call1(
+                        *call,
+                        Box::new(Self::from_pair(expr, var_map)?),
+                    ))
                 } else {
                     Err(Error::new_from_span(
                         ErrorVariant::CustomError {
@@ -238,7 +273,10 @@ impl Function {
                 if let Some(call) = CALL_2_FN_MAP.get(func.as_str()) {
                     Ok(Self::Call2(
                         *call,
-                        Box::new([Self::from_pair(expr1)?, Self::from_pair(expr2)?]),
+                        Box::new([
+                            Self::from_pair(expr1, var_map)?,
+                            Self::from_pair(expr2, var_map)?,
+                        ]),
                     ))
                 } else {
                     Err(Error::new_from_span(
@@ -249,13 +287,13 @@ impl Function {
                     ))
                 }
             }
-            Rule::primary => Self::from_pair(pair.into_inner().next().unwrap()),
-            Rule::primitive => Self::from_pair(pair.into_inner().next().unwrap()),
+            Rule::primary => Self::from_pair(pair.into_inner().next().unwrap(), var_map),
+            Rule::primitive => Self::from_pair(pair.into_inner().next().unwrap(), var_map),
             Rule::var => {
                 if let Some(constant) = CONSTS.get(pair.as_str()) {
                     Ok(Self::Const(*constant))
-                } else if pair.as_str() == "t" {
-                    Ok(Self::Var)
+                } else if let Some(index) = var_map.get(pair.as_str()) {
+                    Ok(Self::Var(*index))
                 } else {
                     Err(Error::new_from_span(
                         ErrorVariant::CustomError {
@@ -271,26 +309,79 @@ impl Function {
         }
     }
 
-    fn eval(&self, t: f64) -> f64 {
+    fn eval(&self, t: f64, assigns: &[Function]) -> f64 {
         match self {
-            Self::Var => t,
+            Self::Var(index) => index.map(|i| assigns[i].eval(t, assigns)).unwrap_or(t),
             Self::Const(c) => *c,
             Self::Add(fs) => fs.iter().fold(0.0, |acc, (f, op)| match *op {
-                OpType::Normal => acc + f.eval(t),
-                OpType::Inverse => acc - f.eval(t),
+                OpType::Normal => acc + f.eval(t, assigns),
+                OpType::Inverse => acc - f.eval(t, assigns),
                 _ => unreachable!(),
             }),
             Self::Mul(fs) => fs.iter().fold(1.0, |acc, (f, op)| match *op {
-                OpType::Normal => acc * f.eval(t),
-                OpType::Inverse => acc / f.eval(t),
-                OpType::Third => acc.div_euclid(f.eval(t)),
-                OpType::Fourth => acc.rem_euclid(f.eval(t)),
+                OpType::Normal => acc * f.eval(t, assigns),
+                OpType::Inverse => acc / f.eval(t, assigns),
+                OpType::Third => acc.div_euclid(f.eval(t, assigns)),
+                OpType::Fourth => acc.rem_euclid(f.eval(t, assigns)),
             }),
-            Self::Exp(fs) => fs.iter().rev().fold(1.0, |acc, f| f.eval(t).powf(acc)),
-            Self::Neg(f) => -f.eval(t),
-            Self::Call1(call, f) => call.call(f.eval(t)),
-            Self::Call2(call, fs) => call.call(fs[0].eval(t), fs[1].eval(t)),
+            Self::Exp(fs) => fs
+                .iter()
+                .rev()
+                .fold(1.0, |acc, f| f.eval(t, assigns).powf(acc)),
+            Self::Neg(f) => -f.eval(t, assigns),
+            Self::Call1(call, f) => call.call(f.eval(t, assigns)),
+            Self::Call2(call, fs) => call.call(fs[0].eval(t, assigns), fs[1].eval(t, assigns)),
         }
+    }
+}
+
+/// Maps variable indexes to functions
+type AssignVec = Vec<Function>;
+
+/// Maps variable names to indexes
+type VarIndexMap = FxHashMap<String, Option<usize>>;
+
+trait Assigns: Sized {
+    fn from_pairs(pairs: Pairs<Rule>) -> Result<(Self, VarIndexMap), Error<Rule>>;
+}
+
+impl Assigns for AssignVec {
+    fn from_pairs(pairs: Pairs<Rule>) -> Result<(Self, VarIndexMap), Error<Rule>> {
+        let mut var_map = [("t".to_owned(), None)]
+            .into_iter()
+            .collect::<FxHashMap<_, _>>();
+
+        let assign_vec = pairs
+            .filter(|pair| pair.as_rule() != Rule::EOI)
+            .enumerate()
+            .map(|(i, pair)| {
+                let mut pairs = pair.into_inner();
+                let var = pairs.next().unwrap();
+                let var = if var_map.contains_key(var.as_str()) {
+                    Err(Error::new_from_span(
+                        ErrorVariant::CustomError {
+                            message: format!("'{}' is already defined", var.as_str()),
+                        },
+                        var.as_span(),
+                    ))?
+                } else if CONSTS.contains_key(var.as_str()) {
+                    Err(Error::new_from_span(
+                        ErrorVariant::CustomError {
+                            message: format!("cannot assign to constant '{}'", var.as_str()),
+                        },
+                        var.as_span(),
+                    ))?
+                } else {
+                    var.as_str().to_owned()
+                };
+
+                var_map.insert(var, Some(i));
+                let expr = Function::from_pair(pairs.next().unwrap(), &var_map)?;
+                Ok(expr)
+            })
+            .collect::<Result<_, _>>()?;
+
+        Ok((assign_vec, var_map))
     }
 }
 
@@ -298,6 +389,20 @@ impl Function {
 pub struct Parametric {
     pub x: Function,
     pub y: Function,
+    pub assigns: AssignVec,
+}
+
+impl Parametric {
+    pub fn try_new(x: Function, y: Function, assigns: AssignVec) -> Result<Self, Error<Rule>> {
+        Ok(Self { x, y, assigns })
+    }
+
+    fn eval(&self, t: f64) -> Vec2 {
+        Vec2::new(
+            self.x.eval(t, &self.assigns) as f32,
+            self.y.eval(t, &self.assigns) as f32,
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -309,6 +414,7 @@ pub struct FireRocket {
 pub fn handle_fire_events(
     function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
     function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
+    assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntry>)>,
     players: Query<(&Owner, &GlobalTransform), With<Player>>,
     mut fire_events: EventReader<FireRocket>,
     asset_server: Res<AssetServer>,
@@ -319,16 +425,34 @@ pub fn handle_fire_events(
 
         let fx = function_x
             .iter()
-            .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.0))
+            .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
         let fy = function_y
             .iter()
-            .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.0))
+            .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
-        let transform = players
+        let assigns = assigns
             .iter()
-            .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
+            .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
+
+        let (assigns, var_map) = match FunctionParser::parse(Rule::assigns, assigns) {
+            Ok(mut pairs) => {
+                let assign_pairs = pairs.next().unwrap().into_inner();
+                match AssignVec::from_pairs(assign_pairs) {
+                    Ok(assigns) => assigns,
+                    Err(error) => {
+                        log::warn!("Error parsing 'where': {}", error);
+                        continue 'main;
+                    }
+                }
+            }
+
+            Err(error) => {
+                log::warn!("Error parsing 'where': {}", error);
+                continue 'main;
+            }
+        };
 
         let mut funcs = Vec::with_capacity(2);
 
@@ -337,7 +461,7 @@ pub fn handle_fire_events(
                 Ok(mut pairs) => {
                     let func = pairs.next().unwrap();
                     let expr = func.into_inner().next().unwrap();
-                    match Function::from_pair(expr) {
+                    match Function::from_pair(expr, &var_map) {
                         Ok(f) => funcs.push(f),
                         Err(error) => {
                             log::warn!("Error parsing {}(t): {}", axis, error);
@@ -356,16 +480,29 @@ pub fn handle_fire_events(
         let fy = funcs.pop().unwrap();
         let fx = funcs.pop().unwrap();
         //println!("{:#?}", fy);
-        let start_x = fx.eval(0.0) as f32;
-        let start_y = fy.eval(0.0) as f32;
+        let start_x = fx.eval(0.0, &assigns) as f32;
+        let start_y = fy.eval(0.0, &assigns) as f32;
+
+        let parametric = match Parametric::try_new(fx, fy, assigns) {
+            Ok(p) => p,
+            Err(error) => {
+                log::warn!("Error parsing 'where': {}", error);
+                continue 'main;
+            }
+        };
+
+        let transform = players
+            .iter()
+            .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
+            .unwrap();
 
         commands
             .spawn_bundle(Svg2dBundle {
                 svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
-                transform: (*transform).into(),
+                transform: Transform::from(*transform).with_scale([0.4; 3].into()),
                 ..Default::default()
             })
-            .insert(Parametric { x: fx, y: fy })
+            .insert(parametric)
             .insert(Offset(
                 transform.translation.xy() - Vec2::new(start_x, start_y),
             ))
@@ -396,14 +533,12 @@ pub fn move_rockets(
             commands.entity(entity).despawn();
         }
 
-        let x = parametric.x.eval(timer.percent() as f64);
-        let y = parametric.y.eval(timer.percent() as f64);
-        let next_pos = Vec2::new(x as f32, y as f32) + offset.0;
+        let next_pos = parametric.eval(timer.percent() as f64) + offset.0;
         let curr_pos = transform.translation.xy();
         if next_pos - curr_pos != Vec2::ZERO {
             transform.rotation =
                 Quat::from_rotation_arc_2d(Vec2::X, (next_pos - curr_pos).normalize());
         }
-        transform.translation = next_pos.extend(3.0);
+        transform.translation = next_pos.extend(z::ROCKET);
     }
 }

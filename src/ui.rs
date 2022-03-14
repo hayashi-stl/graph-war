@@ -6,7 +6,12 @@ use bevy_inspector_egui::Inspectable;
 use egui::Align2;
 use fxhash::FxHashMap;
 
-use crate::{graph::FireRocket, Owner};
+use crate::{
+    graph::{FireRocket, QUICK_HELP},
+    Owner,
+};
+
+const FONT_SIZE: f32 = 18.0;
 
 trait EntityCommandsExt {
     /// UI for inputting a function
@@ -42,7 +47,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     ) -> &mut Self {
         let function_label_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 20.0,
+            font_size: FONT_SIZE,
             color: Color::BLACK,
         };
         let center_align = TextAlignment {
@@ -52,7 +57,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
         let left_side_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 20.0,
+            font_size: FONT_SIZE,
             color: Color::BLACK,
         };
 
@@ -66,7 +71,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             node.spawn_bundle(TextBundle {
                 text: Text::with_section(
                     format!(
-                        "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)",
+                        concat!(
+                            "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)\n",
+                            "The curve will be moved so it starts at your position",
+                        ),
                         player_index + 1
                     ),
                     function_label_style.clone(),
@@ -74,7 +82,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                 ),
                 style: Style {
                     align_self: AlignSelf::Center,
-                    margin: Rect{ top: Val::Px(15.0), ..Default::default() },
+                    margin: Rect {
+                        top: Val::Px(15.0),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -111,7 +122,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                             flex_basis: Val::Percent(100.0),
                             flex_grow: 1.0,
                             flex_shrink: 1.0,
-                            min_size: Size::new(Val::Px(0.0), Val::Px(25.0)),
+                            min_size: Size::new(Val::Px(0.0), Val::Px(23.0)),
                             margin: Rect::all(Val::Px(4.0)),
                             ..Default::default()
                         },
@@ -122,10 +133,56 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(FunctionEntry)
                     .maybe_insert((axis == "x").then(|| FunctionX))
                     .maybe_insert((axis == "y").then(|| FunctionY))
-                    .insert(Textbox("".to_owned()))
+                    .insert(Textbox {
+                        text: "".to_owned(),
+                        multiline: false,
+                    })
                     .insert(EguiId::default());
                 });
             }
+
+            node.spawn_bundle(NodeBundle {
+                style: Style {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Stretch,
+                    ..Default::default()
+                },
+                color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                ..Default::default()
+            })
+            .with_children(|node| {
+                node.spawn_bundle(TextBundle {
+                    text: Text::with_section("where", left_side_style.clone(), center_align),
+                    style: Style {
+                        align_self: AlignSelf::FlexEnd,
+                        margin: Rect::all(Val::Px(4.0)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+
+                // Textbox spot
+                node.spawn_bundle(NodeBundle {
+                    style: Style {
+                        flex_basis: Val::Percent(100.0),
+                        flex_grow: 1.0,
+                        flex_shrink: 1.0,
+                        min_size: Size::new(Val::Px(0.0), Val::Px(72.0)),
+                        margin: Rect::all(Val::Px(4.0)),
+                        ..Default::default()
+                    },
+                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                    ..Default::default()
+                })
+                .insert(Owner(player_index))
+                .insert(FunctionEntry)
+                .insert(FunctionWhere)
+                .insert(Textbox {
+                    text: "".to_owned(),
+                    multiline: true,
+                })
+                .insert(EguiId::default());
+            });
 
             node.spawn_bundle(ButtonBundle {
                 style: Style {
@@ -153,6 +210,23 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     ..Default::default()
                 });
             });
+
+            node.spawn_bundle(TextBundle {
+                text: Text::with_section(
+                    QUICK_HELP,
+                    left_side_style.clone(),
+                    TextAlignment {
+                        horizontal: HorizontalAlign::Left,
+                        vertical: VerticalAlign::Center,
+                    },
+                ),
+                style: Style {
+                    align_self: AlignSelf::FlexStart,
+                    margin: Rect::all(Val::Px(4.0)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
         })
     }
 
@@ -163,7 +237,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     ) -> &mut Self {
         let function_label_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 20.0,
+            font_size: FONT_SIZE,
             color: Color::BLACK,
         };
         let center_align = TextAlignment {
@@ -173,7 +247,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
         let left_side_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 20.0,
+            font_size: FONT_SIZE,
             color: Color::BLACK,
         };
 
@@ -203,10 +277,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
             node.spawn_bundle(TextBundle {
                 text: Text::with_section(
-                    format!(
-                        "P{}'s function: (0 ≤ t ≤ 1)",
-                        player_index + 1
-                    ),
+                    format!("P{}'s function: (0 ≤ t ≤ 1)", player_index + 1),
                     function_label_style.clone(),
                     center_align,
                 ),
@@ -258,7 +329,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(Owner(player_index))
                     .maybe_insert((axis == "x").then(|| FunctionX))
                     .maybe_insert((axis == "y").then(|| FunctionY))
-                    .insert(Textbox("".to_owned()))
+                    .insert(Textbox {
+                        text: "".to_owned(),
+                        multiline: false,
+                    })
                     .insert(EguiId::default());
                 });
             }
@@ -394,7 +468,10 @@ pub fn setup_egui(mut egui_ctx: ResMut<EguiContext>) {
 /// Labels entities that should get an egui textbox.
 /// Stores the text that goes in the textbox.
 #[derive(Component)]
-pub struct Textbox(pub String);
+pub struct Textbox {
+    pub text: String,
+    pub multiline: bool,
+}
 
 /// Labels function entry textboxes
 #[derive(Component)]
@@ -408,13 +485,19 @@ pub struct FunctionX;
 #[derive(Component)]
 pub struct FunctionY;
 
+/// Labels "where" textbox
+#[derive(Component)]
+pub struct FunctionWhere;
+
 pub fn update_textboxes(
     mut textboxes: Query<(&mut Textbox, &EguiId, &Node, &GlobalTransform)>,
     mut egui_ctx: ResMut<EguiContext>,
     windows: Res<Windows>,
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
-        if size.size.x == 0.0 && size.size.y == 0.0 { continue }
+        if size.size.x == 0.0 && size.size.y == 0.0 {
+            continue;
+        }
 
         let id = if let Some(id) = id.0 { id } else { continue };
         let left = transform.translation.x - size.size.x / 2.0;
@@ -425,13 +508,28 @@ pub fn update_textboxes(
             .show(egui_ctx.ctx_mut(), |ui| {
                 ui.set_width(size.size.x);
                 ui.set_height(size.size.y);
-                ui.add_sized(
-                    ui.available_size(),
-                    egui::TextEdit::singleline(&mut textbox.0).font(egui::FontId {
-                        family: egui::FontFamily::Monospace,
-                        size: 20.0,
-                    }),
-                )
+
+                fn add_textbox<'r>(
+                    ui: &mut egui::Ui,
+                    text: &'r mut String,
+                    text_edit_fn: impl Fn(&'r mut dyn egui::TextBuffer) -> egui::TextEdit<'r>,
+                ) {
+                    ui.add_sized(
+                        ui.available_size(),
+                        text_edit_fn(text).font(egui::FontId {
+                            family: egui::FontFamily::Monospace,
+                            size: FONT_SIZE,
+                        }),
+                    );
+                };
+
+                if textbox.multiline {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        add_textbox(ui, &mut textbox.text, egui::TextEdit::multiline)
+                    });
+                } else {
+                    add_textbox(ui, &mut textbox.text, egui::TextEdit::singleline);
+                }
             });
     }
 }

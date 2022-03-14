@@ -4,6 +4,7 @@
 extern crate pest_derive;
 
 pub mod graph;
+pub mod random;
 pub mod ui;
 
 use bevy::{
@@ -13,9 +14,13 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_svg::prelude::*;
+use rand::prelude::Distribution;
+use rand_pcg::Pcg64;
 use std::iter;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::random::RectRegion;
 
 #[cfg(target_family = "wasm")]
 #[macro_export]
@@ -53,6 +58,10 @@ pub fn run() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(ui::IdLender::default())
+        .insert_resource(Pcg64::new(
+            0xcafef00dd15ea5e5,
+            0xa02bdbf7bb3c0a7ac28fa16a64abf96,
+        ))
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
@@ -74,7 +83,16 @@ pub fn run() {
         .run();
 }
 
-pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
+/// Z-indexes
+pub mod z {
+    pub const GRID: f32 = 0.0;
+    pub const GRID_TEXT: f32 = 1.0;
+    pub const PLAYER: f32 = 2.0;
+    pub const ITEM: f32 = 2.0;
+    pub const ROCKET: f32 = 3.0;
+}
+
+pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>, mut rng: ResMut<Pcg64>) {
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
     let cell_size = 1.0;
@@ -129,10 +147,10 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     for dist in (1..(scale / cell_size) as i32).map(|i| i as f32 * cell_size) {
         let transforms = [
-            Transform::from_xyz(0.0, dist, 0.0),
-            Transform::from_xyz(0.0, -dist, 0.0),
-            rot_90.mul_transform(Transform::from_xyz(0.0, dist, 0.0)),
-            rot_90.mul_transform(Transform::from_xyz(0.0, -dist, 0.0)),
+            Transform::from_xyz(0.0, dist, z::GRID),
+            Transform::from_xyz(0.0, -dist, z::GRID),
+            rot_90.mul_transform(Transform::from_xyz(0.0, dist, z::GRID)),
+            rot_90.mul_transform(Transform::from_xyz(0.0, -dist, z::GRID)),
         ];
         for transform in transforms {
             commands.spawn_bundle(SpriteBundle {
@@ -146,11 +164,11 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
             let dist = dist * dir;
             let pairs = [
                 (
-                    Transform::from_xyz(dist, -0.05, 1.0),
+                    Transform::from_xyz(dist, -0.05, z::GRID_TEXT),
                     label_alignment_x,
                 ),
                 (
-                    Transform::from_xyz(-0.05, dist, 1.0),
+                    Transform::from_xyz(-0.05, dist, z::GRID_TEXT),
                     label_alignment_y,
                 ),
             ];
@@ -171,10 +189,10 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
     }
 
     for (i, pos) in [
-        [-3.0, 3.0, 2.0],
-        [-3.0, -3.0, 2.0],
-        [3.0, 3.0, 2.0],
-        [3.0, -3.0, 2.0],
+        [-3.0, 3.0, z::PLAYER],
+        [-3.0, -3.0, z::PLAYER],
+        [3.0, 3.0, z::PLAYER],
+        [3.0, -3.0, z::PLAYER],
     ]
     .into_iter()
     .enumerate()
@@ -188,6 +206,52 @@ pub fn load_field(mut commands: Commands, asset_server: Res<AssetServer>) {
             })
             .insert(Owner(i as u32))
             .insert(Player);
+    }
+
+    let item_distribution = RectRegion::new(
+        &[
+            Rect {
+                left: -0.875,
+                right: -0.5,
+                bottom: -0.5,
+                top: 0.5,
+            },
+            Rect {
+                left: 0.5,
+                right: 0.875,
+                bottom: -0.5,
+                top: 0.5,
+            },
+            Rect {
+                left: -0.5,
+                right: 0.5,
+                bottom: -0.875,
+                top: -0.5,
+            },
+            Rect {
+                left: -0.5,
+                right: 0.5,
+                bottom: 0.5,
+                top: 0.875,
+            },
+            Rect {
+                left: -0.5,
+                right: 0.5,
+                bottom: -0.5,
+                top: 0.5,
+            },
+        ],
+        scale,
+    );
+    let num_points = 100;
+    let points = item_distribution.sample_iter(&mut *rng).take(num_points);
+    for point in points {
+        commands.spawn_bundle(Svg2dBundle {
+            svg: asset_server.load("extra.svg"),
+            transform: Transform::from_translation(point.extend(z::ITEM))
+                .with_scale(Vec3::from([0.3; 3])),
+            ..Default::default()
+        });
     }
 }
 
@@ -210,7 +274,7 @@ fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
     mut graph_node: Query<(&mut Style, With<ui::GraphNode>)>,
     mut camera: Query<&mut OrthographicProjection, Without<ui::UiCamera>>,
-    windows: Res<Windows>,
+    windows: ResMut<Windows>,
 ) {
     let width = windows.get_primary().unwrap().width() as f32;
     let height = windows.get_primary().unwrap().height() as f32;
