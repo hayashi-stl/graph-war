@@ -4,7 +4,7 @@ use bevy_svg::prelude::Svg2dBundle;
 use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
 use pest::{
-    error::{Error, ErrorVariant},
+    error::{Error, ErrorVariant, LineColLocation},
     iterators::{Pair, Pairs},
     Parser,
 };
@@ -12,7 +12,7 @@ use std::{iter, time::Duration};
 
 use crate::{
     collision::{CollisionGroups, PrevPosition},
-    ui::{FunctionEntry, FunctionWhere, FunctionX, FunctionY, Textbox},
+    ui::{FunctionEntry, FunctionStatus, FunctionWhere, FunctionX, FunctionY, Textbox},
     z, Owner, PlayerLabel,
 };
 
@@ -365,14 +365,14 @@ impl Assigns for AssignVec {
                             message: format!("'{}' is already defined", var.as_str()),
                         },
                         var.as_span(),
-                    ))
+                    ));
                 } else if CONSTS.contains_key(var.as_str()) {
                     return Err(Error::new_from_span(
                         ErrorVariant::CustomError {
                             message: format!("cannot assign to constant '{}'", var.as_str()),
                         },
                         var.as_span(),
-                    ))
+                    ));
                 } else {
                     var.as_str().to_owned()
                 };
@@ -413,16 +413,60 @@ pub struct FireRocket {
     pub player_index: u32,
 }
 
+struct ParseError {
+    error: Error<Rule>,
+    label: String,
+    include_line: bool,
+}
+
+impl ParseError {
+    fn new(error: Error<Rule>, label: String, include_line: bool) -> Self {
+        Self {
+            error,
+            label,
+            include_line,
+        }
+    }
+}
+
+fn set_status_text(text: &mut Text, error: Option<ParseError>) {
+    if let Some(error) = error {
+        let message_end = match error.error.variant {
+            ErrorVariant::CustomError { message } => message,
+            ErrorVariant::ParsingError { .. } => "syntax".into(),
+        };
+        let (line, column) = match error.error.line_col {
+            LineColLocation::Pos((l, c)) | LineColLocation::Span((l, c), _) => (l, c),
+        };
+        let line_message = if error.include_line {
+            format!("line {} ", line)
+        } else {
+            String::new()
+        };
+        let message = format!(
+            "Error in {} ({}col {}): {}\n",
+            error.label, line_message, column, message_end
+        );
+        text.sections[0].value = message.into();
+        text.sections[0].style.color = Color::MAROON;
+    } else {
+        text.sections[0].value = "Successfully entered functions\n".into();
+        text.sections[0].style.color = Color::DARK_GREEN;
+    }
+}
+
 pub fn handle_fire_events(
     function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
     function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
     assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntry>)>,
     players: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
+    mut status: Query<&mut Text, With<FunctionStatus>>,
     mut fire_events: EventReader<FireRocket>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
 ) {
     'main: for event in fire_events.iter() {
+        let mut status_text = status.get_single_mut().unwrap();
         let player = event.player_index;
 
         let fx = function_x
@@ -444,14 +488,20 @@ pub fn handle_fire_events(
                 match AssignVec::from_pairs(assign_pairs) {
                     Ok(assigns) => assigns,
                     Err(error) => {
-                        log::warn!("Error parsing 'where': {}", error);
+                        set_status_text(
+                            &mut *status_text,
+                            Some(ParseError::new(error, "'where'".into(), true)),
+                        );
                         continue 'main;
                     }
                 }
             }
 
             Err(error) => {
-                log::warn!("Error parsing 'where': {}", error);
+                set_status_text(
+                    &mut *status_text,
+                    Some(ParseError::new(error, "'where'".into(), true)),
+                );
                 continue 'main;
             }
         };
@@ -466,14 +516,20 @@ pub fn handle_fire_events(
                     match Function::from_pair(expr, &var_map) {
                         Ok(f) => funcs.push(f),
                         Err(error) => {
-                            log::warn!("Error parsing {}(t): {}", axis, error);
+                            set_status_text(
+                                &mut *status_text,
+                                Some(ParseError::new(error, format!("{}(t)", axis), false)),
+                            );
                             continue 'main;
                         }
                     }
                 }
 
                 Err(error) => {
-                    log::warn!("Error parsing {}(t): {}", axis, error);
+                    set_status_text(
+                        &mut *status_text,
+                        Some(ParseError::new(error, format!("{}(t)", axis), false)),
+                    );
                     continue 'main;
                 }
             }
@@ -488,10 +544,15 @@ pub fn handle_fire_events(
         let parametric = match Parametric::try_new(fx, fy, assigns) {
             Ok(p) => p,
             Err(error) => {
-                log::warn!("Error parsing 'where': {}", error);
+                set_status_text(
+                    &mut *status_text,
+                    Some(ParseError::new(error, "'where'".into(), true)),
+                );
                 continue 'main;
             }
         };
+
+        set_status_text(&mut *status_text, None);
 
         let transform = players
             .iter()

@@ -67,17 +67,25 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 
         self.with_children(|node| {
             node.spawn_bundle(TextBundle {
-                text: Text::with_section(
-                    format!(
-                        concat!(
-                            "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)\n",
-                            "The curve will be moved so it starts at your position",
-                        ),
-                        player_index + 1
-                    ),
-                    function_label_style.clone(),
-                    center_align,
-                ),
+                text: Text {
+                    sections: vec![
+                        TextSection {
+                            value: " \n".to_owned(),
+                            style: function_label_style.clone(),
+                        },
+                        TextSection {
+                            value: format!(
+                                concat!(
+                                    "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)\n",
+                                    "The curve will be moved so it starts at your position",
+                                ),
+                                player_index + 1
+                            ),
+                            style: function_label_style.clone(),
+                        },
+                    ],
+                    alignment: center_align,
+                },
                 style: Style {
                     align_self: AlignSelf::Center,
                     margin: Rect {
@@ -87,7 +95,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     ..Default::default()
                 },
                 ..Default::default()
-            });
+            })
+            .insert(FunctionStatus);
 
             for axis in ["x", "y"] {
                 node.spawn_bundle(NodeBundle {
@@ -480,6 +489,10 @@ pub struct FunctionY;
 /// Labels "where" textbox
 #[derive(Component)]
 pub struct FunctionWhere;
+
+/// Labels status text, which shows "success" or an error message in the first section
+#[derive(Component)]
+pub struct FunctionStatus;
 
 pub fn update_textboxes(
     mut textboxes: Query<(&mut Textbox, &EguiId, &Node, &GlobalTransform)>,
