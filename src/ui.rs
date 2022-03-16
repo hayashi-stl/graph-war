@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_egui::EguiContext;
 use bevy_inspector_egui::Inspectable;
@@ -251,12 +249,6 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             color: Color::BLACK,
         };
 
-        let button_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 28.0,
-            color: Color::BLACK,
-        };
-
         self.with_children(|node| {
             fn spawn_edge<'w, 's, 'a, 'b>(
                 node: &'b mut ChildBuilder<'w, 's, 'a>,
@@ -492,7 +484,6 @@ pub struct FunctionWhere;
 pub fn update_textboxes(
     mut textboxes: Query<(&mut Textbox, &EguiId, &Node, &GlobalTransform)>,
     mut egui_ctx: ResMut<EguiContext>,
-    windows: Res<Windows>,
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
         if size.size.x == 0.0 && size.size.y == 0.0 {
@@ -521,7 +512,7 @@ pub fn update_textboxes(
                             size: FONT_SIZE,
                         }),
                     );
-                };
+                }
 
                 if textbox.multiline {
                     egui::ScrollArea::vertical().show(ui, |ui| {

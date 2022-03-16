@@ -1,4 +1,5 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
+use bevy_rapier2d::prelude::*;
 use bevy_svg::prelude::Svg2dBundle;
 use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
@@ -10,8 +11,9 @@ use pest::{
 use std::{iter, time::Duration};
 
 use crate::{
+    collision::{CollisionGroups, PrevPosition},
     ui::{FunctionEntry, FunctionWhere, FunctionX, FunctionY, Textbox},
-    z, Owner, Player,
+    z, Owner, PlayerLabel,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -25,14 +27,14 @@ Operations:
 add (+), subtract (-), multiply (*), divide (/),
 floor divide (//), modulo (%), exponent (^)
 
+Constants: tau, pi, e
+
 Unary functions (syntax: `sin a`):
-sin, cos, tan, asin, acos, atan,
-sinh, cosh, tanh, asinh, acosh, atanh,
-ln, log2, log10, sqrt, cbrt,
+sin, cos, tan, asin, acos, atan, sinh, cosh, tanh,
+asinh, acosh, atanh, ln, log2, log10, sqrt, cbrt,
 abs, sign, floor, ceil, fract
 
-Binary functions (syntax: `min a b`):
-min, max, atan2
+Binary functions (syntax: `min a b`): min, max, atan2
 
 Precedence (highest to lowest):
 function call
@@ -358,19 +360,19 @@ impl Assigns for AssignVec {
                 let mut pairs = pair.into_inner();
                 let var = pairs.next().unwrap();
                 let var = if var_map.contains_key(var.as_str()) {
-                    Err(Error::new_from_span(
+                    return Err(Error::new_from_span(
                         ErrorVariant::CustomError {
                             message: format!("'{}' is already defined", var.as_str()),
                         },
                         var.as_span(),
-                    ))?
+                    ))
                 } else if CONSTS.contains_key(var.as_str()) {
-                    Err(Error::new_from_span(
+                    return Err(Error::new_from_span(
                         ErrorVariant::CustomError {
                             message: format!("cannot assign to constant '{}'", var.as_str()),
                         },
                         var.as_span(),
-                    ))?
+                    ))
                 } else {
                     var.as_str().to_owned()
                 };
@@ -415,7 +417,7 @@ pub fn handle_fire_events(
     function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
     function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
     assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntry>)>,
-    players: Query<(&Owner, &GlobalTransform), With<Player>>,
+    players: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
     mut fire_events: EventReader<FireRocket>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
@@ -496,10 +498,11 @@ pub fn handle_fire_events(
             .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
             .unwrap();
 
+        let scale = 0.4;
         commands
             .spawn_bundle(Svg2dBundle {
                 svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
-                transform: Transform::from(*transform).with_scale([0.4; 3].into()),
+                transform: Transform::from(*transform).with_scale([scale; 3].into()),
                 ..Default::default()
             })
             .insert(parametric)
@@ -508,15 +511,40 @@ pub fn handle_fire_events(
             ))
             .insert(Rocket)
             .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
-            .insert(Owner(player));
+            .insert(Owner(player))
+            .insert(PrevPosition(transform.translation.xy()))
+            .insert_bundle(RigidBodyBundle {
+                body_type: RigidBodyType::KinematicPositionBased.into(),
+                position: transform.translation.xy().extend(0.0).into(),
+                // kinematic-static CCD doesn't work
+                ..Default::default()
+            })
+            .with_children(|body| {
+                body.spawn_bundle(ColliderBundle {
+                    shape: ColliderShape::ball(scale / 2.0).into(),
+                    collider_type: ColliderType::Solid.into(),
+                    position: Vec2::ZERO.into(),
+                    flags: ColliderFlags {
+                        collision_groups: InteractionGroups::new(
+                            CollisionGroups::ROCKET.bits(),
+                            CollisionGroups::ROCKET_CAST.bits(),
+                        ),
+                        active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
+                            | ActiveCollisionTypes::KINEMATIC_STATIC,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                });
+            });
     }
 }
 
 pub fn move_rockets(
     mut rockets: Query<
         (
-            &Owner,
             &mut Transform,
+            &mut RigidBodyPositionComponent,
             &Offset,
             &Parametric,
             &mut Timer,
@@ -527,10 +555,12 @@ pub fn move_rockets(
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (owner, mut transform, offset, parametric, mut timer, entity) in rockets.iter_mut() {
+    for (mut transform, mut body_position, offset, parametric, mut timer, entity) in
+        rockets.iter_mut()
+    {
         timer.tick(time.delta());
         if timer.finished() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
 
         let next_pos = parametric.eval(timer.percent() as f64) + offset.0;
@@ -540,5 +570,7 @@ pub fn move_rockets(
                 Quat::from_rotation_arc_2d(Vec2::X, (next_pos - curr_pos).normalize());
         }
         transform.translation = next_pos.extend(z::ROCKET);
+        body_position.0.next_position =
+            Isometry::new(next_pos.into(), transform.rotation.to_axis_angle().1);
     }
 }

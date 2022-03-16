@@ -4,6 +4,7 @@ use rand::prelude::Distribution;
 
 /// A region made of disjoint rectangles.
 /// Can be used to sample a point.
+#[derive(Clone, Debug)]
 pub struct RectRegion {
     rects: Vec<(Rect<f32>, f32)>,
     scale: f32,
