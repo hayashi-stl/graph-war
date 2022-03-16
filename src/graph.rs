@@ -12,8 +12,12 @@ use std::{iter, time::Duration};
 
 use crate::{
     collision::{CollisionGroups, PrevPosition},
-    ui::{FunctionEntry, FunctionStatus, FunctionWhere, FunctionX, FunctionY, Textbox},
-    z, Owner, PlayerLabel,
+    time::{DelayedEvent, DelayedEventBundle},
+    ui::{
+        FunctionEntry, FunctionStatus, FunctionWhere, FunctionX, FunctionY, Textbox,
+        TextboxesEditable,
+    },
+    z, Owner, Player, PlayerLabel,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -447,7 +451,7 @@ fn set_status_text(text: &mut Text, error: Option<ParseError>) {
             "Error in {} ({}col {}): {}\n",
             error.label, line_message, column, message_end
         );
-        text.sections[0].value = message.into();
+        text.sections[0].value = message;
         text.sections[0].style.color = Color::MAROON;
     } else {
         text.sections[0].value = "Successfully entered functions\n".into();
@@ -459,11 +463,13 @@ pub fn handle_fire_events(
     function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
     function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
     assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntry>)>,
-    players: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
+    player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
+    mut players: ResMut<Vec<Player>>,
     mut status: Query<&mut Text, With<FunctionStatus>>,
     mut fire_events: EventReader<FireRocket>,
     asset_server: Res<AssetServer>,
     mut commands: Commands,
+    mut textboxes_editable: ResMut<TextboxesEditable>,
 ) {
     'main: for event in fire_events.iter() {
         let mut status_text = status.get_single_mut().unwrap();
@@ -554,50 +560,55 @@ pub fn handle_fire_events(
 
         set_status_text(&mut *status_text, None);
 
-        let transform = players
-            .iter()
-            .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
-            .unwrap();
+        players[player as usize].parametric = Some(parametric);
 
-        let scale = 0.4;
-        commands
-            .spawn_bundle(Svg2dBundle {
-                svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
-                transform: Transform::from(*transform).with_scale([scale; 3].into()),
-                ..Default::default()
-            })
-            .insert(parametric)
-            .insert(Offset(
-                transform.translation.xy() - Vec2::new(start_x, start_y),
-            ))
-            .insert(Rocket)
-            .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
-            .insert(Owner(player))
-            .insert(PrevPosition(transform.translation.xy()))
-            .insert_bundle(RigidBodyBundle {
-                body_type: RigidBodyType::KinematicPositionBased.into(),
-                position: transform.translation.xy().extend(0.0).into(),
-                // kinematic-static CCD doesn't work
-                ..Default::default()
-            })
-            .with_children(|body| {
-                body.spawn_bundle(ColliderBundle {
-                    shape: ColliderShape::ball(scale / 2.0).into(),
-                    collider_type: ColliderType::Solid.into(),
-                    position: Vec2::ZERO.into(),
-                    flags: ColliderFlags {
-                        collision_groups: InteractionGroups::new(
-                            CollisionGroups::ROCKET.bits(),
-                            CollisionGroups::ROCKET_CAST.bits(),
-                        ),
-                        active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
-                            | ActiveCollisionTypes::KINEMATIC_STATIC,
-                        ..Default::default()
-                    }
-                    .into(),
-                    ..Default::default()
-                });
-            });
+        commands.spawn_bundle(DelayedEventBundle::new(1.0, DelayedEvent::AdvanceTurn));
+        textboxes_editable.0 = false;
+
+        //let transform = player_comps
+        //    .iter()
+        //    .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
+        //    .unwrap();
+
+        //let scale = 0.4;
+        //commands
+        //    .spawn_bundle(Svg2dBundle {
+        //        svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
+        //        transform: Transform::from(*transform).with_scale([scale; 3].into()),
+        //        ..Default::default()
+        //    })
+        //    .insert(parametric)
+        //    .insert(Offset(
+        //        transform.translation.xy() - Vec2::new(start_x, start_y),
+        //    ))
+        //    .insert(Rocket)
+        //    .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
+        //    .insert(Owner(player))
+        //    .insert(PrevPosition(transform.translation.xy()))
+        //    .insert_bundle(RigidBodyBundle {
+        //        body_type: RigidBodyType::KinematicPositionBased.into(),
+        //        position: transform.translation.xy().extend(0.0).into(),
+        //        // kinematic-static CCD doesn't work
+        //        ..Default::default()
+        //    })
+        //    .with_children(|body| {
+        //        body.spawn_bundle(ColliderBundle {
+        //            shape: ColliderShape::ball(scale / 2.0).into(),
+        //            collider_type: ColliderType::Solid.into(),
+        //            position: Vec2::ZERO.into(),
+        //            flags: ColliderFlags {
+        //                collision_groups: InteractionGroups::new(
+        //                    CollisionGroups::ROCKET.bits(),
+        //                    CollisionGroups::ROCKET_CAST.bits(),
+        //                ),
+        //                active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
+        //                    | ActiveCollisionTypes::KINEMATIC_STATIC,
+        //                ..Default::default()
+        //            }
+        //            .into(),
+        //            ..Default::default()
+        //        });
+        //    });
     }
 }
 

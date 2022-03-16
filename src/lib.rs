@@ -7,6 +7,7 @@ extern crate pest_derive;
 pub mod collision;
 pub mod graph;
 pub mod random;
+pub mod time;
 pub mod ui;
 
 use bevy::{
@@ -19,6 +20,7 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
 use bevy_svg::prelude::*;
+use graph::Parametric;
 use rand::prelude::Distribution;
 use rand_pcg::Pcg64;
 #[cfg(target_family = "wasm")]
@@ -57,6 +59,8 @@ pub struct PlayerLabel;
 #[derive(Clone, Debug, Default)]
 pub struct Player {
     pub num_balls: u32,
+    /// Parametric is stored here until rocket gets fired
+    pub parametric: Option<Parametric>,
 }
 
 #[derive(Component)]
@@ -65,7 +69,45 @@ pub struct Ball;
 #[derive(Component)]
 pub struct Mine;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PlayState {
+    Initial,
+    /// Enter functions
+    Enter,
+    /// Fire rockets
+    Fire,
+}
+
+#[derive(Debug)]
+pub struct Game {
+    /// Whose turn it is
+    pub player_turn: u32,
+    pub scale: f32,
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self {
+            player_turn: 0,
+            scale: 4.0,
+        }
+    }
+}
+
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
+
+#[derive(Clone, Copy, Debug, SystemLabel, PartialEq, Eq, Hash)]
+enum Label {
+    Setup,
+    LoadField,
+    FireButtons,
+    CollectItems,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, StageLabel)]
+enum Stage {
+    AdvanceTimers,
+}
 
 pub fn run() {
     //#[cfg(not(target_family = "wasm"))]
@@ -83,6 +125,9 @@ pub fn run() {
             0xa02bdbf7bb3c0a7ac28fa16a64abf96,
         ))
         .insert_resource(vec![Player::default(); 0])
+        .insert_resource(Game::default())
+        .insert_resource(ui::TextboxesEditable(true))
+        .add_state(PlayState::Initial)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
@@ -90,30 +135,43 @@ pub fn run() {
         .add_plugin(EguiPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_event::<graph::FireRocket>()
-        .add_startup_system(ui::setup_egui.label("setup"))
-        .add_startup_system(ui::load_ui.label("setup"))
-        .add_startup_system(load_field.label("load_field").after("setup"))
-        .add_startup_system(resize.after("load_field"))
-        .add_system(resize.with_run_criteria(resized))
-        .add_system(ui::update_textboxes)
+        .add_event::<time::AdvanceTurn>()
+        .add_stage_before(
+            CoreStage::PreUpdate,
+            Stage::AdvanceTimers,
+            SystemStage::single_threaded(),
+        )
+        .add_startup_system(ui::setup_egui.label(Label::Setup))
+        .add_startup_system(ui::load_ui.label(Label::Setup))
+        .add_startup_system(load_field.label(Label::LoadField).after(Label::Setup))
+        .add_startup_system(resize.after(Label::LoadField))
+        .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
         .add_system_to_stage(CoreStage::PreUpdate, ui::update_buttons)
         .add_system_to_stage(CoreStage::PreUpdate, collision::update_prev_positions)
-        .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
-        .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
+        .add_system(resize.with_run_criteria(resized))
+        .add_system(ui::update_textboxes)
+        .add_system(ui::advance_turn)
+        .add_system_set(SystemSet::on_enter(PlayState::Enter).with_system(init_enter_functions))
         .add_system_set(
-            SystemSet::new()
+            SystemSet::on_update(PlayState::Enter)
                 .before(PhysicsSystems::StepWorld)
-                .with_system(ui::update_fire_buttons.label("fire_buttons"))
-                .with_system(graph::handle_fire_events.after("fire_buttons"))
+                .with_system(ui::update_fire_buttons.label(Label::FireButtons))
+                .with_system(graph::handle_fire_events.after(Label::FireButtons)),
+        )
+        .add_system_set(
+            SystemSet::on_update(PlayState::Fire)
+                .before(PhysicsSystems::StepWorld)
                 .with_system(graph::move_rockets),
         )
         .add_system_set(
-            SystemSet::new()
+            SystemSet::on_update(PlayState::Fire)
                 .after(PhysicsSystems::StepWorld)
                 .with_system(collision::handle_collisions)
-                .with_system(collision::collect_balls.label("collect"))
-                .with_system(update_scores.after("collect")),
+                .with_system(collision::collect_balls.label(Label::CollectItems))
+                .with_system(update_scores.after(Label::CollectItems)),
         )
+        .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
+        .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
         .run();
 }
 
@@ -131,13 +189,14 @@ pub mod z {
 pub fn load_field(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut rng: ResMut<Pcg64>,
     mut players: ResMut<Vec<Player>>,
+    game: Res<Game>,
+    mut play_state: ResMut<State<PlayState>>,
 ) {
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
     let cell_size = 1.0;
-    let scale = 4.0;
+    let scale = game.scale;
 
     let mut camera = OrthographicCameraBundle::new_2d();
     camera.orthographic_projection.scaling_mode = ScalingMode::None;
@@ -275,6 +334,15 @@ pub fn load_field(
         players.push(Player::default());
     }
 
+    play_state.set(PlayState::Enter).unwrap();
+}
+
+fn init_enter_functions(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut rng: ResMut<Pcg64>,
+    game: Res<Game>,
+) {
     #[rustfmt::skip]
     let item_distribution = RectRegion::new(
         &[
@@ -284,7 +352,7 @@ pub fn load_field(
             Rect { left: -0.5,   right:  0.5,   bottom:  0.5,   top:  0.875, },
             Rect { left: -0.5,   right:  0.5,   bottom: -0.5,   top:  0.5,   },
         ],
-        scale,
+        game.scale,
     );
 
     fn spawn_item<'a, 'w, 's>(

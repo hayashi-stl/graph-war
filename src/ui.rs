@@ -6,10 +6,21 @@ use fxhash::FxHashMap;
 
 use crate::{
     graph::{FireRocket, QUICK_HELP},
-    Owner,
+    time::AdvanceTurn,
+    Game, Owner, Player,
 };
 
 const FONT_SIZE: f32 = 18.0;
+
+fn enter_function_text(player_index: u32) -> String {
+    format!(
+        concat!(
+            "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)\n",
+            "The curve will be moved so it starts at your position",
+        ),
+        player_index + 1
+    )
+}
 
 trait EntityCommandsExt {
     /// UI for inputting a function
@@ -74,13 +85,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                             style: function_label_style.clone(),
                         },
                         TextSection {
-                            value: format!(
-                                concat!(
-                                    "P{}: Enter functions in terms of t (0 ≤ t ≤ 1)\n",
-                                    "The curve will be moved so it starts at your position",
-                                ),
-                                player_index + 1
-                            ),
+                            value: enter_function_text(player_index),
                             style: function_label_style.clone(),
                         },
                     ],
@@ -451,6 +456,39 @@ pub fn update_fire_buttons(
     }
 }
 
+pub fn advance_turn(
+    mut advance_turn_events: EventReader<AdvanceTurn>,
+    mut owned_ui: Query<
+        &mut Owner,
+        Or<(
+            With<FunctionX>,
+            With<FunctionY>,
+            With<FunctionEntry>,
+            With<FireButton>,
+        )>,
+    >,
+    mut status_text: Query<&mut Text, With<FunctionStatus>>,
+    players: Res<Vec<Player>>,
+    mut game: ResMut<Game>,
+    mut textboxes_editable: ResMut<TextboxesEditable>,
+) {
+    if advance_turn_events.iter().next().is_none() {
+        return;
+    }
+
+    if game.player_turn < players.len() as u32 - 1 {
+        game.player_turn += 1;
+        for mut owner in owned_ui.iter_mut() {
+            owner.0 = game.player_turn;
+        }
+        textboxes_editable.0 = true;
+
+        let text = &mut status_text.get_single_mut().unwrap();
+        text.sections[0].value = " \n".into();
+        text.sections[1].value = enter_function_text(game.player_turn);
+    }
+}
+
 /// Distinguishes the UI camera from another camera
 #[derive(Component)]
 pub struct UiCamera;
@@ -473,6 +511,9 @@ pub struct Textbox {
     pub text: String,
     pub multiline: bool,
 }
+
+/// Whether textboxes are editable
+pub struct TextboxesEditable(pub bool);
 
 /// Labels function entry textboxes
 #[derive(Component)]
@@ -497,6 +538,7 @@ pub struct FunctionStatus;
 pub fn update_textboxes(
     mut textboxes: Query<(&mut Textbox, &EguiId, &Node, &GlobalTransform)>,
     mut egui_ctx: ResMut<EguiContext>,
+    textboxes_editable: Res<TextboxesEditable>,
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
         if size.size.x == 0.0 && size.size.y == 0.0 {
@@ -515,7 +557,7 @@ pub fn update_textboxes(
 
                 fn add_textbox<'r>(
                     ui: &mut egui::Ui,
-                    text: &'r mut String,
+                    text: &'r mut dyn egui::TextBuffer,
                     text_edit_fn: impl Fn(&'r mut dyn egui::TextBuffer) -> egui::TextEdit<'r>,
                 ) {
                     ui.add_sized(
@@ -529,10 +571,18 @@ pub fn update_textboxes(
 
                 if textbox.multiline {
                     egui::ScrollArea::vertical().show(ui, |ui| {
-                        add_textbox(ui, &mut textbox.text, egui::TextEdit::multiline)
+                        if textboxes_editable.0 {
+                            add_textbox(ui, &mut textbox.text, egui::TextEdit::multiline)
+                        } else {
+                            add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::multiline)
+                        }
                     });
                 } else {
-                    add_textbox(ui, &mut textbox.text, egui::TextEdit::singleline);
+                    if textboxes_editable.0 {
+                        add_textbox(ui, &mut textbox.text, egui::TextEdit::singleline);
+                    } else {
+                        add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::singleline);
+                    }
                 }
             });
     }
