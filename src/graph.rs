@@ -14,8 +14,8 @@ use crate::{
     collision::{CollisionGroups, PrevPosition},
     time::{DelayedEvent, DelayedEventBundle},
     ui::{
-        FunctionEntry, FunctionStatus, FunctionWhere, FunctionX, FunctionY, Textbox,
-        TextboxesEditable,
+        FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere, FunctionX, FunctionY,
+        Textbox, TextboxesEditable,
     },
     z, Owner, Player, PlayerLabel,
 };
@@ -396,11 +396,28 @@ pub struct Parametric {
     pub x: Function,
     pub y: Function,
     pub assigns: AssignVec,
+    pub source_x: Option<String>,
+    pub source_y: Option<String>,
+    pub source_assigns: Option<String>,
 }
 
 impl Parametric {
-    pub fn try_new(x: Function, y: Function, assigns: AssignVec) -> Result<Self, Error<Rule>> {
-        Ok(Self { x, y, assigns })
+    pub fn new(
+        x: Function,
+        y: Function,
+        assigns: AssignVec,
+        source_x: String,
+        source_y: String,
+        source_assigns: String,
+    ) -> Self {
+        Self {
+            x,
+            y,
+            assigns,
+            source_x: Some(source_x),
+            source_y: Some(source_y),
+            source_assigns: Some(source_assigns),
+        }
     }
 
     fn eval(&self, t: f64) -> Vec2 {
@@ -412,8 +429,8 @@ impl Parametric {
 }
 
 #[derive(Clone, Debug)]
-/// Event that says that some player should fire a rocket from their position
-pub struct FireRocket {
+/// Event that says that some player should queue a rocket to be fired from their position
+pub struct SendFunctions {
     pub player_index: u32,
 }
 
@@ -459,36 +476,34 @@ fn set_status_text(text: &mut Text, error: Option<ParseError>) {
     }
 }
 
-pub fn handle_fire_events(
-    function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntry>)>,
-    function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntry>)>,
-    assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntry>)>,
-    player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
+pub fn send_functions(
+    function_x: Query<(&Owner, &Textbox), (With<FunctionX>, With<FunctionEntryBox>)>,
+    function_y: Query<(&Owner, &Textbox), (With<FunctionY>, With<FunctionEntryBox>)>,
+    assigns: Query<(&Owner, &Textbox), (With<FunctionWhere>, With<FunctionEntryBox>)>,
     mut players: ResMut<Vec<Player>>,
     mut status: Query<&mut Text, With<FunctionStatus>>,
-    mut fire_events: EventReader<FireRocket>,
-    asset_server: Res<AssetServer>,
+    mut fire_events: EventReader<SendFunctions>,
     mut commands: Commands,
     mut textboxes_editable: ResMut<TextboxesEditable>,
 ) {
     'main: for event in fire_events.iter() {
-        let mut status_text = status.get_single_mut().unwrap();
+        let mut status_text = status.single_mut();
         let player = event.player_index;
 
-        let fx = function_x
+        let fx_str = function_x
             .iter()
             .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
-        let fy = function_y
+        let fy_str = function_y
             .iter()
             .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
-        let assigns = assigns
+        let where_str = assigns
             .iter()
             .find_map(|(owner, textbox)| (owner.0 == player).then(|| &textbox.text))
             .unwrap();
 
-        let (assigns, var_map) = match FunctionParser::parse(Rule::assigns, assigns) {
+        let (assigns, var_map) = match FunctionParser::parse(Rule::assigns, where_str) {
             Ok(mut pairs) => {
                 let assign_pairs = pairs.next().unwrap().into_inner();
                 match AssignVec::from_pairs(assign_pairs) {
@@ -514,7 +529,7 @@ pub fn handle_fire_events(
 
         let mut funcs = Vec::with_capacity(2);
 
-        for (axis, func) in [("x", fx), ("y", fy)] {
+        for (axis, func) in [("x", fx_str), ("y", fy_str)] {
             match FunctionParser::parse(Rule::func, func) {
                 Ok(mut pairs) => {
                     let func = pairs.next().unwrap();
@@ -543,20 +558,15 @@ pub fn handle_fire_events(
 
         let fy = funcs.pop().unwrap();
         let fx = funcs.pop().unwrap();
-        //println!("{:#?}", fy);
-        let start_x = fx.eval(0.0, &assigns) as f32;
-        let start_y = fy.eval(0.0, &assigns) as f32;
 
-        let parametric = match Parametric::try_new(fx, fy, assigns) {
-            Ok(p) => p,
-            Err(error) => {
-                set_status_text(
-                    &mut *status_text,
-                    Some(ParseError::new(error, "'where'".into(), true)),
-                );
-                continue 'main;
-            }
-        };
+        let parametric = Parametric::new(
+            fx,
+            fy,
+            assigns,
+            fx_str.clone(),
+            fy_str.clone(),
+            where_str.clone(),
+        );
 
         set_status_text(&mut *status_text, None);
 
@@ -564,51 +574,90 @@ pub fn handle_fire_events(
 
         commands.spawn_bundle(DelayedEventBundle::new(1.0, DelayedEvent::AdvanceTurn));
         textboxes_editable.0 = false;
+    }
+}
 
-        //let transform = player_comps
-        //    .iter()
-        //    .find_map(|(owner, transform)| (owner.0 == player).then(|| transform))
-        //    .unwrap();
+pub fn fire_rockets(
+    mut commands: Commands,
+    mut textboxes_fx: Query<(&Owner, &mut Textbox), (With<FunctionDisplayBox>, With<FunctionX>)>,
+    mut textboxes_fy: Query<
+        (&Owner,
+        &mut Textbox),
+        (
+            With<FunctionDisplayBox>,
+            With<FunctionY>,
+            Without<FunctionX>,
+        ),
+    >,
+    mut textboxes_where: Query<
+        (&Owner,
+        &mut Textbox),
+        (
+            With<FunctionDisplayBox>,
+            With<FunctionWhere>,
+            Without<FunctionX>,
+            Without<FunctionY>,
+        ),
+    >,
+    mut players: ResMut<Vec<Player>>,
+    player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
+    asset_server: Res<AssetServer>,
+) {
+    for (owner, mut textbox) in textboxes_fx.iter_mut() {
+        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
+        textbox.text = parametric.source_x.take().unwrap();
+    }
+    for (owner, mut textbox) in textboxes_fy.iter_mut() {
+        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
+        textbox.text = parametric.source_y.take().unwrap();
+    }
+    for (owner, mut textbox) in textboxes_where.iter_mut() {
+        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
+        textbox.text = parametric.source_assigns.take().unwrap();
+    }
 
-        //let scale = 0.4;
-        //commands
-        //    .spawn_bundle(Svg2dBundle {
-        //        svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
-        //        transform: Transform::from(*transform).with_scale([scale; 3].into()),
-        //        ..Default::default()
-        //    })
-        //    .insert(parametric)
-        //    .insert(Offset(
-        //        transform.translation.xy() - Vec2::new(start_x, start_y),
-        //    ))
-        //    .insert(Rocket)
-        //    .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
-        //    .insert(Owner(player))
-        //    .insert(PrevPosition(transform.translation.xy()))
-        //    .insert_bundle(RigidBodyBundle {
-        //        body_type: RigidBodyType::KinematicPositionBased.into(),
-        //        position: transform.translation.xy().extend(0.0).into(),
-        //        // kinematic-static CCD doesn't work
-        //        ..Default::default()
-        //    })
-        //    .with_children(|body| {
-        //        body.spawn_bundle(ColliderBundle {
-        //            shape: ColliderShape::ball(scale / 2.0).into(),
-        //            collider_type: ColliderType::Solid.into(),
-        //            position: Vec2::ZERO.into(),
-        //            flags: ColliderFlags {
-        //                collision_groups: InteractionGroups::new(
-        //                    CollisionGroups::ROCKET.bits(),
-        //                    CollisionGroups::ROCKET_CAST.bits(),
-        //                ),
-        //                active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
-        //                    | ActiveCollisionTypes::KINEMATIC_STATIC,
-        //                ..Default::default()
-        //            }
-        //            .into(),
-        //            ..Default::default()
-        //        });
-        //    });
+    for (owner, transform) in player_comps.iter() {
+        let player = owner.0;
+        let parametric = players[player as usize].parametric.take().unwrap();
+        let start = parametric.eval(0.0);
+
+        let scale = 0.4;
+        commands
+            .spawn_bundle(Svg2dBundle {
+                svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
+                transform: Transform::from(*transform).with_scale([scale; 3].into()),
+                ..Default::default()
+            })
+            .insert(parametric)
+            .insert(Offset(transform.translation.xy() - start))
+            .insert(Rocket)
+            .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
+            .insert(Owner(player))
+            .insert(PrevPosition(transform.translation.xy()))
+            .insert_bundle(RigidBodyBundle {
+                body_type: RigidBodyType::KinematicPositionBased.into(),
+                position: transform.translation.xy().extend(0.0).into(),
+                // kinematic-static CCD doesn't work
+                ..Default::default()
+            })
+            .with_children(|body| {
+                body.spawn_bundle(ColliderBundle {
+                    shape: ColliderShape::ball(scale / 2.0).into(),
+                    collider_type: ColliderType::Solid.into(),
+                    position: Vec2::ZERO.into(),
+                    flags: ColliderFlags {
+                        collision_groups: InteractionGroups::new(
+                            CollisionGroups::ROCKET.bits(),
+                            CollisionGroups::ROCKET_CAST.bits(),
+                        ),
+                        active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
+                            | ActiveCollisionTypes::KINEMATIC_STATIC,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                });
+            });
     }
 }
 

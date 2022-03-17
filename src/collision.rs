@@ -62,6 +62,11 @@ pub fn collect_balls(
             continue;
         }
 
+        // The colliders are missing for 1 frame, so skip that frame
+        if colliders.0 .0.len() == 0 {
+            return;
+        }
+
         // Perform shape-casts one at a time to get all the balls swept
         // Unfortunately, kinematic-static CCD doesn't work so mines are getting swept as well here.
         let rocket_collider_entity = colliders.0 .0[0].entity();

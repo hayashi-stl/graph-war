@@ -102,6 +102,7 @@ enum Label {
     LoadField,
     FireButtons,
     CollectItems,
+    AdvanceTurn,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, StageLabel)]
@@ -134,7 +135,7 @@ pub fn run() {
         .add_plugin(SvgPlugin)
         .add_plugin(EguiPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_event::<graph::FireRocket>()
+        .add_event::<graph::SendFunctions>()
         .add_event::<time::AdvanceTurn>()
         .add_stage_before(
             CoreStage::PreUpdate,
@@ -150,13 +151,17 @@ pub fn run() {
         .add_system_to_stage(CoreStage::PreUpdate, collision::update_prev_positions)
         .add_system(resize.with_run_criteria(resized))
         .add_system(ui::update_textboxes)
-        .add_system(ui::advance_turn)
         .add_system_set(SystemSet::on_enter(PlayState::Enter).with_system(init_enter_functions))
         .add_system_set(
             SystemSet::on_update(PlayState::Enter)
                 .before(PhysicsSystems::StepWorld)
-                .with_system(ui::update_fire_buttons.label(Label::FireButtons))
-                .with_system(graph::handle_fire_events.after(Label::FireButtons)),
+                .with_system(ui::update_done_buttons.label(Label::FireButtons))
+                .with_system(graph::send_functions.after(Label::FireButtons)),
+        )
+        .add_system_set(
+            SystemSet::on_enter(PlayState::Fire)
+                .after(Label::AdvanceTurn)
+                .with_system(graph::fire_rockets),
         )
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
@@ -169,6 +174,11 @@ pub fn run() {
                 .with_system(collision::handle_collisions)
                 .with_system(collision::collect_balls.label(Label::CollectItems))
                 .with_system(update_scores.after(Label::CollectItems)),
+        )
+        .add_system(
+            ui::advance_turn
+                .label(Label::AdvanceTurn)
+                .after(Label::CollectItems),
         )
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
