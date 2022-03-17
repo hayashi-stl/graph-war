@@ -12,12 +12,12 @@ use std::{iter, time::Duration};
 
 use crate::{
     collision::{CollisionGroups, PrevPosition},
-    time::{DelayedEvent, DelayedEventBundle},
+    time::{DelayedEvent, DelayedEventBundle, AdvanceRound},
     ui::{
         FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere, FunctionX, FunctionY,
-        Textbox, TextboxesEditable,
+        Textbox, TextboxesEditable, ButtonsEnabled,
     },
-    z, Owner, Player, PlayerLabel,
+    z, Owner, Player, PlayerLabel, PlayState,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -485,6 +485,7 @@ pub fn send_functions(
     mut fire_events: EventReader<SendFunctions>,
     mut commands: Commands,
     mut textboxes_editable: ResMut<TextboxesEditable>,
+    mut buttons_enabled: ResMut<ButtonsEnabled>,
 ) {
     'main: for event in fire_events.iter() {
         let mut status_text = status.single_mut();
@@ -574,6 +575,7 @@ pub fn send_functions(
 
         commands.spawn_bundle(DelayedEventBundle::new(1.0, DelayedEvent::AdvanceTurn));
         textboxes_editable.0 = false;
+        buttons_enabled.0 = false;
     }
 }
 
@@ -675,10 +677,13 @@ pub fn move_rockets(
     >,
     mut commands: Commands,
     time: Res<Time>,
+    mut play_state: ResMut<State<PlayState>>,
 ) {
+    let mut rockets_exist = false;
     for (mut transform, mut body_position, offset, parametric, mut timer, entity) in
         rockets.iter_mut()
     {
+        rockets_exist = true;
         timer.tick(time.delta());
         if timer.finished() {
             commands.entity(entity).despawn_recursive();
@@ -693,5 +698,11 @@ pub fn move_rockets(
         transform.translation = next_pos.extend(z::ROCKET);
         body_position.0.next_position =
             Isometry::new(next_pos.into(), transform.rotation.to_axis_angle().1);
+    }
+
+    if !rockets_exist {
+        commands.spawn_bundle(DelayedEventBundle::new(2.0, DelayedEvent::AdvanceRound));
+        // Stop running this system so we don't spawn lots of DelayedEventBundle's
+        play_state.set(PlayState::Wait).unwrap();
     }
 }

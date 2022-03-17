@@ -474,23 +474,30 @@ pub struct DoneButton;
 const NORMAL_BUTTON: Color = Color::rgb(0.85, 0.85, 0.85);
 const HOVERED_BUTTON: Color = Color::rgb(0.80, 0.80, 0.80);
 const PRESSED_BUTTON: Color = Color::rgb(0.75, 0.75, 0.75);
+const DISABLED_BUTTON: Color = Color::rgb(0.70, 0.70, 0.70);
 
 pub fn update_buttons(
-    mut buttons: Query<(&Interaction, &mut UiColor), (Changed<Interaction>, With<Button>)>,
+    mut buttons: Query<(&Interaction, &mut UiColor), With<Button>>,
+    buttons_enabled: Res<ButtonsEnabled>,
 ) {
     for (interaction, mut color) in buttons.iter_mut() {
-        *color = match interaction {
-            Interaction::None => UiColor(NORMAL_BUTTON),
-            Interaction::Hovered => UiColor(HOVERED_BUTTON),
-            Interaction::Clicked => UiColor(PRESSED_BUTTON),
-        }
+        *color = if buttons_enabled.0 {
+            match interaction {
+                Interaction::None => UiColor(NORMAL_BUTTON),
+                Interaction::Hovered => UiColor(HOVERED_BUTTON),
+                Interaction::Clicked => UiColor(PRESSED_BUTTON),
+            }
+        } else { UiColor(DISABLED_BUTTON) }
     }
 }
 
 pub fn update_done_buttons(
     buttons: Query<(&Interaction, &Owner), (Changed<Interaction>, With<DoneButton>)>,
     mut fire_events: EventWriter<SendFunctions>,
+    buttons_enabled: Res<ButtonsEnabled>,
 ) {
+    if !buttons_enabled.0 { return; }
+    
     for (interaction, owner) in buttons.iter() {
         if *interaction == Interaction::Clicked {
             fire_events.send(SendFunctions {
@@ -509,6 +516,7 @@ pub fn advance_turn(
     players: Res<Vec<Player>>,
     mut game: ResMut<Game>,
     mut textboxes_editable: ResMut<TextboxesEditable>,
+    mut buttons_enabled: ResMut<ButtonsEnabled>,
     mut function_ui: Query<&mut Style, With<FunctionUi>>,
     mut function_display: Query<&mut Style, (With<FunctionDisplay>, Without<FunctionUi>)>,
 ) {
@@ -522,6 +530,8 @@ pub fn advance_turn(
     } else {
         textboxes_editable.0 = true;
     }
+    buttons_enabled.0 = true;
+
     for mut owner in owned_ui.iter_mut() {
         owner.0 = game.player_turn;
     }
@@ -575,6 +585,10 @@ pub struct Textbox {
 /// Whether textboxes are editable
 pub struct TextboxesEditable(pub bool);
 
+/// Whether buttons are enabled
+pub struct ButtonsEnabled(pub bool);
+
+/// Labels function entry textboxes
 /// Labels function entry textboxes
 #[derive(Component)]
 pub struct FunctionEntryBox;

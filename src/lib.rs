@@ -23,6 +23,7 @@ use bevy_svg::prelude::*;
 use graph::Parametric;
 use rand::prelude::Distribution;
 use rand_pcg::Pcg64;
+use time::AdvanceRound;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -71,7 +72,7 @@ pub struct Mine;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlayState {
-    Initial,
+    Wait,
     /// Enter functions
     Enter,
     /// Fire rockets
@@ -128,7 +129,8 @@ pub fn run() {
         .insert_resource(vec![Player::default(); 0])
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
-        .add_state(PlayState::Initial)
+        .insert_resource(ui::ButtonsEnabled(true))
+        .add_state(PlayState::Wait)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
@@ -137,6 +139,7 @@ pub fn run() {
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_event::<graph::SendFunctions>()
         .add_event::<time::AdvanceTurn>()
+        .add_event::<time::AdvanceRound>()
         .add_stage_before(
             CoreStage::PreUpdate,
             Stage::AdvanceTimers,
@@ -180,6 +183,7 @@ pub fn run() {
                 .label(Label::AdvanceTurn)
                 .after(Label::CollectItems),
         )
+        .add_system(start_new_round)
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
         .run();
@@ -347,6 +351,14 @@ pub fn load_field(
     play_state.set(PlayState::Enter).unwrap();
 }
 
+fn start_new_round(
+    mut advance_round_events: EventReader<AdvanceRound>,
+    mut play_state: ResMut<State<PlayState>>,
+) {
+    if advance_round_events.iter().next().is_none() { return; }
+    play_state.set(PlayState::Enter).unwrap();
+}
+
 fn init_enter_functions(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -384,7 +396,6 @@ fn init_enter_functions(
                 position: point.xy().extend(0.0).into(),
                 ..Default::default()
             })
-            .insert(RigidBodyPositionSync::Discrete)
             .with_children(|body| {
                 body.spawn_bundle(ColliderBundle {
                     shape: ColliderShape::ball(scale / 2.0).into(),

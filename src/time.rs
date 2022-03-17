@@ -5,11 +5,16 @@ use bevy::prelude::*;
 #[derive(Clone, Copy, Debug, Component, PartialEq, Eq)]
 pub enum DelayedEvent {
     AdvanceTurn,
+    AdvanceRound,
 }
 
 /// Event to move on to the next player
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AdvanceTurn;
+
+/// Event to move on to the next round
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AdvanceRound;
 
 #[derive(Clone, Debug, Bundle)]
 pub struct DelayedEventBundle {
@@ -32,12 +37,14 @@ pub fn advance_timers(
     time: Res<Time>,
     mut timers: Query<(Entity, &mut Timer, &DelayedEvent)>,
     mut advance_turn_events: EventWriter<AdvanceTurn>,
+    mut advance_round_events: EventWriter<AdvanceRound>,
 ) {
     for (entity, mut timer, event) in timers.iter_mut() {
         if timer.tick(time.delta()).finished() {
             commands.entity(entity).despawn();
             match event {
                 DelayedEvent::AdvanceTurn => advance_turn_events.send(AdvanceTurn),
+                DelayedEvent::AdvanceRound => advance_round_events.send(AdvanceRound),
             }
         }
     }
