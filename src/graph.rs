@@ -1,6 +1,5 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
 use bevy_rapier2d::prelude::*;
-use bevy_svg::prelude::Svg2dBundle;
 use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
 use pest::{
@@ -625,8 +624,12 @@ pub fn fire_rockets(
 
         let scale = 0.4;
         commands
-            .spawn_bundle(Svg2dBundle {
-                svg: asset_server.load(&format!("rocket{}.svg", player + 1)),
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(2.4, 1.2)),
+                    ..Default::default()
+                },
+                texture: asset_server.load(&format!("rocket{}.png", player + 1)),
                 transform: Transform::from(*transform).with_scale([scale; 3].into()),
                 ..Default::default()
             })

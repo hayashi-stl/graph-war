@@ -9,13 +9,13 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="1mm"
-   height="1mm"
-   viewBox="0 0 1 1"
+   width="256"
+   height="256"
+   viewBox="0 0 67.733331 67.733331"
    version="1.1"
    id="svg8"
    inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
-   sodipodi:docname="extra.svg">
+   sodipodi:docname="ball.svg">
   <defs
      id="defs2" />
   <sodipodi:namedview
@@ -25,13 +25,13 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="64"
-     inkscape:cx="1.7075893"
-     inkscape:cy="0.92835578"
-     inkscape:document-units="mm"
+     inkscape:zoom="1"
+     inkscape:cx="6.1607143"
+     inkscape:cy="4.1939808"
+     inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
-     units="mm"
+     units="px"
      inkscape:snap-object-midpoints="true"
      inkscape:snap-page="true"
      inkscape:snap-bbox="false"
@@ -57,17 +57,17 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(0,-296.00001)">
+     transform="translate(0,-229.26668)">
     <circle
-       style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:#808080;stroke-width:0.1;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
+       style="opacity:1;fill:#ffffff;fill-opacity:1;fill-rule:evenodd;stroke:#808080;stroke-width:4.48054409;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
        id="path817"
-       cx="0"
-       cy="296"
-       r="0.49999997" />
+       cx="33.866665"
+       cy="263.13333"
+       r="22.402718" />
     <path
-       style="opacity:1;fill:#808080;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.37795275;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
-       d="M -0.25 -0.90625 L -0.25 -0.25 L -0.90625 -0.25 L -0.90625 0.25 L -0.25 0.25 L -0.25 0.90625 L 0.25 0.90625 L 0.25 0.25 L 0.90625 0.25 L 0.90625 -0.25 L 0.25 -0.25 L 0.25 -0.90625 L -0.25 -0.90625 z "
-       transform="matrix(0.26458333,0,0,0.26458333,0,296.00001)"
-       id="rect1215" />
+       style="opacity:1;fill:#808080;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:4.48054314;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
+       d="m 30.903014,252.39027 v 7.78002 h -7.779703 v 5.92731 h 7.779703 v 7.77957 h 5.927357 v -7.77957 h 7.779702 v -5.92731 h -7.779702 v -7.78002 z"
+       id="rect1215"
+       inkscape:connector-curvature="0" />
   </g>
 </svg>

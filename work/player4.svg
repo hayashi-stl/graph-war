@@ -15,8 +15,8 @@
    version="1.1"
    id="svg8"
    inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
-   sodipodi:docname="player1.svg"
-   inkscape:export-filename="/home/joshua/rust/graph-war/assets/player1.png"
+   sodipodi:docname="player4.svg"
+   inkscape:export-filename="/home/joshua/rust/graph-war/assets/player4.png"
    inkscape:export-xdpi="95.900002"
    inkscape:export-ydpi="95.900002">
   <defs
@@ -62,14 +62,14 @@
      id="layer1"
      transform="translate(0,-229.26668)">
     <circle
-       style="opacity:1;fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke:#800000;stroke-width:6.13731098;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
+       style="opacity:1;fill:#00ff00;fill-opacity:1;fill-rule:evenodd;stroke:#008000;stroke-width:6.13731098;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
        id="path817"
        cx="33.866665"
        cy="263.13333"
        r="30.686554" />
     <text
        xml:space="preserve"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:50.79560089px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#800000;stroke-width:16.23830032"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:50.79560089px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#008000;stroke-width:16.23830032;"
        x="33.869175"
        y="281.2673"
        id="text823"><tspan
@@ -77,6 +77,6 @@
          id="tspan821"
          x="33.869175"
          y="281.2673"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Bold';text-align:center;text-anchor:middle;fill:#800000;stroke-width:16.23830032">1</tspan></text>
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Bold';text-align:center;text-anchor:middle;fill:#008000;stroke-width:16.23830032;">4</tspan></text>
   </g>
 </svg>

@@ -19,7 +19,6 @@ use bevy::{
 };
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
-use bevy_svg::prelude::*;
 use graph::Parametric;
 use rand::prelude::Distribution;
 use rand_pcg::Pcg64;
@@ -134,7 +133,6 @@ pub fn run() {
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
-        .add_plugin(SvgPlugin)
         .add_plugin(EguiPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_event::<graph::SendFunctions>()
@@ -323,8 +321,12 @@ pub fn load_field(
     {
         // Player icon
         commands
-            .spawn_bundle(Svg2dBundle {
-                svg: asset_server.load(&format!("player{}.svg", i + 1)),
+            .spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    custom_size: Some(Vec2::ONE),
+                    ..Default::default()
+                },
+                texture: asset_server.load(&format!("player{}.png", i + 1)),
                 transform: Transform::from_translation(Vec3::from(pos))
                     .with_scale(Vec3::from([0.4; 3])),
                 ..Default::default()
@@ -385,9 +387,13 @@ fn init_enter_functions(
     ) -> EntityCommands<'w, 's, 'a> {
         let scale = 0.3;
 
-        let mut entity_commands = commands.spawn_bundle(Svg2dBundle {
-            svg: asset_server.load(["ball.svg", "mine.svg"][item_type]),
-            transform: Transform::from_translation(point).with_scale(Vec3::from([scale; 3])),
+        let mut entity_commands = commands.spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                custom_size: Some(Vec2::ONE),
+                ..Default::default()
+            },
+            texture: asset_server.load(["ball.png", "mine.png"][item_type]),
+            transform: Transform::from_translation(point).with_scale(Vec3::from([scale * 1.375; 3])),
             ..Default::default()
         });
         entity_commands

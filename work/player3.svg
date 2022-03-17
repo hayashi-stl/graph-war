@@ -9,13 +9,16 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="1mm"
-   height="1mm"
-   viewBox="0 0 1 1"
+   width="256"
+   height="256"
+   viewBox="0 0 67.733331 67.733331"
    version="1.1"
    id="svg8"
    inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
-   sodipodi:docname="player1.svg">
+   sodipodi:docname="player3.svg"
+   inkscape:export-filename="/home/joshua/rust/graph-war/assets/player3.png"
+   inkscape:export-xdpi="95.900002"
+   inkscape:export-ydpi="95.900002">
   <defs
      id="defs2" />
   <sodipodi:namedview
@@ -25,13 +28,13 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="64"
-     inkscape:cx="1.4732143"
-     inkscape:cy="0.92835578"
+     inkscape:zoom="1"
+     inkscape:cx="119.80134"
+     inkscape:cy="92.240856"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
-     units="mm"
+     units="px"
      inkscape:snap-object-midpoints="true"
      inkscape:snap-page="true"
      inkscape:snap-bbox="true"
@@ -57,21 +60,23 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1"
-     transform="translate(0,-296.00001)">
+     transform="translate(0,-229.26668)">
     <circle
-       style="opacity:1;fill:#ff0000;fill-opacity:1;fill-rule:evenodd;stroke:#800000;stroke-width:0.1;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
+       style="opacity:1;fill:#ffff00;fill-opacity:1;fill-rule:evenodd;stroke:#808000;stroke-width:6.13731098;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0"
        id="path817"
-       cx="0"
-       cy="296"
-       r="0.49999997" />
-    <g
-       aria-label="1"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:0.82765239px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#800000;stroke-width:0.26458332"
-       id="text823">
-      <path
-         d="m 0.10515332,296.29547 h -0.12497551 v -0.34182 q 0,-0.0215 8.2765e-4,-0.0563 0.0016553,-0.0348 0.002483,-0.0613 -0.0041383,0.005 -0.01820835,0.0182 -0.01324244,0.0124 -0.02482957,0.0224 l -0.0678675,0.0546 -0.0604186,-0.0753 0.19036005,-0.15146 h 0.10262889 z"
-         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Bold';text-align:center;text-anchor:middle;fill:#800000;stroke-width:0.26458332"
-         id="path1100" />
-    </g>
+       cx="33.866665"
+       cy="263.13333"
+       r="30.686554" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:50.79560089px;line-height:1.25;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-feature-settings:normal;text-align:start;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#808000;stroke-width:16.23830032"
+       x="33.869175"
+       y="281.2673"
+       id="text823"><tspan
+         sodipodi:role="line"
+         id="tspan821"
+         x="33.869175"
+         y="281.2673"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:'Noto Sans';-inkscape-font-specification:'Noto Sans Bold';text-align:center;text-anchor:middle;fill:#808000;stroke-width:16.23830032">3</tspan></text>
   </g>
 </svg>
