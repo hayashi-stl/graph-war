@@ -11,22 +11,20 @@ pub mod time;
 pub mod ui;
 
 use bevy::{
-    ecs::{schedule::ShouldRun, system::EntityCommands},
+    ecs::system::EntityCommands,
     math::{Mat2, Vec3Swizzles},
     prelude::*,
     render::camera::ScalingMode,
-    window::WindowResized,
 };
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
 use graph::Parametric;
 use rand::prelude::Distribution;
 use rand_pcg::Pcg64;
-use time::AdvanceRound;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
-use crate::{collision::CollisionGroups, random::RectRegion};
+use crate::{collision::CollisionGroups, random::RectRegion, time::AdvanceRound};
 
 #[cfg(target_family = "wasm")]
 #[macro_export]
@@ -80,17 +78,42 @@ pub enum PlayState {
 
 #[derive(Debug)]
 pub struct Game {
-    /// Whose turn it is
-    pub player_turn: u32,
+    pub order_index: u32,
+    pub player_order: Vec<u32>,
+    pub inverse_order: Vec<u32>,
     pub scale: f32,
 }
 
 impl Default for Game {
     fn default() -> Self {
         Self {
-            player_turn: 0,
+            order_index: 0,
+            player_order: vec![],
+            inverse_order: vec![],
             scale: 4.0,
         }
+    }
+}
+
+impl Game {
+    pub fn set_num_players(&mut self, num_players: u32) {
+        self.player_order = (0..num_players).collect();
+        self.inverse_order = self.player_order.clone();
+    }
+
+    pub fn rotate_players(&mut self) {
+        self.player_order.rotate_left(1);
+        self.inverse_order.rotate_right(1);
+    }
+
+    /// Whose turn it is
+    pub fn player_turn(&self) -> u32 {
+        self.player_order[self.order_index as usize]
+    }
+
+    /// When a player goes
+    pub fn order_index(&self, player: u32) -> u32 {
+        self.inverse_order[player as usize]
     }
 }
 
@@ -100,9 +123,12 @@ pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 enum Label {
     Setup,
     LoadField,
-    FireButtons,
+    DoneButton,
+    AdvanceRoundButton,
     CollectItems,
     AdvanceTurn,
+    MovePlayers,
+    MoveRockets,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, StageLabel)]
@@ -146,18 +172,22 @@ pub fn run() {
         .add_startup_system(ui::setup_egui.label(Label::Setup))
         .add_startup_system(ui::load_ui.label(Label::Setup))
         .add_startup_system(load_field.label(Label::LoadField).after(Label::Setup))
-        .add_startup_system(resize.after(Label::LoadField))
+        .add_startup_system(ui::advance_round.after(Label::LoadField))
         .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
         .add_system_to_stage(CoreStage::PreUpdate, ui::update_buttons)
         .add_system_to_stage(CoreStage::PreUpdate, collision::update_prev_positions)
-        .add_system(resize.with_run_criteria(resized))
+        .add_system(resize)
         .add_system(ui::update_textboxes)
-        .add_system_set(SystemSet::on_enter(PlayState::Enter).with_system(init_enter_functions))
+        .add_system_set(
+            SystemSet::on_enter(PlayState::Enter)
+                .with_system(move_players.label(Label::MovePlayers))
+                .with_system(init_enter_functions.after(Label::MovePlayers)),
+        )
         .add_system_set(
             SystemSet::on_update(PlayState::Enter)
                 .before(PhysicsSystems::StepWorld)
-                .with_system(ui::update_done_buttons.label(Label::FireButtons))
-                .with_system(graph::send_functions.after(Label::FireButtons)),
+                .with_system(ui::update_done_button.label(Label::DoneButton))
+                .with_system(graph::send_functions.after(Label::DoneButton)),
         )
         .add_system_set(
             SystemSet::on_enter(PlayState::Fire)
@@ -167,7 +197,9 @@ pub fn run() {
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
                 .before(PhysicsSystems::StepWorld)
-                .with_system(graph::move_rockets),
+                .with_system(graph::move_rockets.label(Label::MoveRockets))
+                .with_system(ui::update_next_round_button.label(Label::AdvanceRoundButton))
+                .with_system(ui::advance_round.after(Label::AdvanceRoundButton)),
         )
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
@@ -181,7 +213,6 @@ pub fn run() {
                 .label(Label::AdvanceTurn)
                 .after(Label::CollectItems),
         )
-        .add_system(start_new_round)
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
         .run();
@@ -202,8 +233,8 @@ pub fn load_field(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut players: ResMut<Vec<Player>>,
-    game: Res<Game>,
-    mut play_state: ResMut<State<PlayState>>,
+    mut game: ResMut<Game>,
+    mut advance_round_events: EventWriter<AdvanceRound>,
 ) {
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
@@ -310,15 +341,15 @@ pub fn load_field(
         horizontal: HorizontalAlign::Center,
     };
 
-    for (i, pos) in [
+    let positions = [
         [-3.0, 3.0, z::PLAYER],
         [-3.0, -3.0, z::PLAYER],
         [3.0, 3.0, z::PLAYER],
         [3.0, -3.0, z::PLAYER],
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    ];
+    game.set_num_players(positions.len() as u32);
+
+    for (i, pos) in positions.into_iter().enumerate() {
         // Player icon
         commands
             .spawn_bundle(SpriteBundle {
@@ -350,15 +381,27 @@ pub fn load_field(
         players.push(Player::default());
     }
 
-    play_state.set(PlayState::Enter).unwrap();
+    advance_round_events.send(AdvanceRound);
 }
 
-fn start_new_round(
-    mut advance_round_events: EventReader<AdvanceRound>,
-    mut play_state: ResMut<State<PlayState>>,
+fn move_players(
+    game: Res<Game>,
+    mut player_comps: Query<(&Owner, &mut Transform), With<PlayerLabel>>,
+    mut scores: Query<(&Owner, &mut Transform), (With<Score>, Without<PlayerLabel>)>,
 ) {
-    if advance_round_events.iter().next().is_none() { return; }
-    play_state.set(PlayState::Enter).unwrap();
+    let positions = [
+        [-3.0, 3.0, z::PLAYER],
+        [-3.0, -3.0, z::PLAYER],
+        [3.0, 3.0, z::PLAYER],
+        [3.0, -3.0, z::PLAYER],
+    ];
+    for (owner, mut transform) in player_comps.iter_mut() {
+        transform.translation = positions[game.order_index(owner.0) as usize].into();
+    }
+    for (owner, mut transform) in scores.iter_mut() {
+        transform.translation = positions[game.order_index(owner.0) as usize].into();
+        transform.translation *= 3.4 / 3.0;
+    }
 }
 
 fn init_enter_functions(
@@ -366,7 +409,12 @@ fn init_enter_functions(
     asset_server: Res<AssetServer>,
     mut rng: ResMut<Pcg64>,
     game: Res<Game>,
+    items: Query<Entity, Or<(With<Ball>, With<Mine>)>>,
 ) {
+    for entity in items.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
     #[rustfmt::skip]
     let item_distribution = RectRegion::new(
         &[
@@ -393,7 +441,8 @@ fn init_enter_functions(
                 ..Default::default()
             },
             texture: asset_server.load(["ball.png", "mine.png"][item_type]),
-            transform: Transform::from_translation(point).with_scale(Vec3::from([scale * 1.375; 3])),
+            transform: Transform::from_translation(point)
+                .with_scale(Vec3::from([scale * 1.375; 3])),
             ..Default::default()
         });
         entity_commands
@@ -441,16 +490,16 @@ fn update_scores(mut scores: Query<(&mut Text, &Owner), With<Score>>, players: R
 #[derive(Component)]
 pub struct RelativeTextSize(pub f32);
 
-fn resized(
-    mut resize_events: EventReader<WindowResized>,
-    new_cameras: Query<&OrthographicProjection, Added<OrthographicProjection>>,
-) -> ShouldRun {
-    if resize_events.iter().next().is_some() || !new_cameras.is_empty() {
-        ShouldRun::Yes
-    } else {
-        ShouldRun::No
-    }
-}
+//fn resized(
+//    mut resize_events: EventReader<WindowResized>,
+//    new_cameras: Query<&OrthographicProjection, Added<OrthographicProjection>>,
+//) -> ShouldRun {
+//    if resize_events.iter().next().is_some() || !new_cameras.is_empty() {
+//        ShouldRun::Yes
+//    } else {
+//        ShouldRun::No
+//    }
+//}
 
 fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,

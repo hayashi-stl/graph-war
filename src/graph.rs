@@ -11,12 +11,12 @@ use std::{iter, time::Duration};
 
 use crate::{
     collision::{CollisionGroups, PrevPosition},
-    time::{DelayedEvent, DelayedEventBundle, AdvanceRound},
+    time::{DelayedEvent, DelayedEventBundle},
     ui::{
-        FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere, FunctionX, FunctionY,
-        Textbox, TextboxesEditable, ButtonsEnabled,
+        ButtonsEnabled, FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere,
+        FunctionX, FunctionY, Textbox, TextboxesEditable,
     },
-    z, Owner, Player, PlayerLabel, PlayState,
+    z, Owner, Player, PlayerLabel,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -582,8 +582,7 @@ pub fn fire_rockets(
     mut commands: Commands,
     mut textboxes_fx: Query<(&Owner, &mut Textbox), (With<FunctionDisplayBox>, With<FunctionX>)>,
     mut textboxes_fy: Query<
-        (&Owner,
-        &mut Textbox),
+        (&Owner, &mut Textbox),
         (
             With<FunctionDisplayBox>,
             With<FunctionY>,
@@ -591,8 +590,7 @@ pub fn fire_rockets(
         ),
     >,
     mut textboxes_where: Query<
-        (&Owner,
-        &mut Textbox),
+        (&Owner, &mut Textbox),
         (
             With<FunctionDisplayBox>,
             With<FunctionWhere>,
@@ -622,11 +620,11 @@ pub fn fire_rockets(
         let parametric = players[player as usize].parametric.take().unwrap();
         let start = parametric.eval(0.0);
 
-        let scale = 0.4;
+        let scale = 0.3;
         commands
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(2.4, 1.2)),
+                    custom_size: Some(Vec2::new(2.8, 1.4)),
                     ..Default::default()
                 },
                 texture: asset_server.load(&format!("rocket{}.png", player + 1)),
@@ -675,17 +673,23 @@ pub fn move_rockets(
             &Parametric,
             &mut Timer,
             Entity,
+            &RigidBodyCollidersComponent,
         ),
         With<Rocket>,
     >,
     mut commands: Commands,
     time: Res<Time>,
-    mut play_state: ResMut<State<PlayState>>,
+    mut buttons_enabled: ResMut<ButtonsEnabled>,
 ) {
     let mut rockets_exist = false;
-    for (mut transform, mut body_position, offset, parametric, mut timer, entity) in
+    for (mut transform, mut body_position, offset, parametric, mut timer, entity, colliders) in
         rockets.iter_mut()
     {
+        // The colliders are missing for 1 frame, so skip that frame
+        if colliders.0 .0.is_empty() {
+            return;
+        }
+
         rockets_exist = true;
         timer.tick(time.delta());
         if timer.finished() {
@@ -704,8 +708,6 @@ pub fn move_rockets(
     }
 
     if !rockets_exist {
-        commands.spawn_bundle(DelayedEventBundle::new(2.0, DelayedEvent::AdvanceRound));
-        // Stop running this system so we don't spawn lots of DelayedEventBundle's
-        play_state.set(PlayState::Wait).unwrap();
+        buttons_enabled.0 = true;
     }
 }

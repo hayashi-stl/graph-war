@@ -50,7 +50,7 @@ pub fn collect_balls(
 ) {
     let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
-    // Each impact contains a player index, a player rocket entity, ball/mine/rocket entity, and a time of impact.
+    // Each impact contains a player index, a player rocket entity, an optional other player index, a ball/mine/rocket entity, and a time of impact.
     let mut impacts = vec![];
 
     for (rocket, prev_pos, curr_transform, colliders, owner) in rockets.iter() {
@@ -63,7 +63,7 @@ pub fn collect_balls(
         }
 
         // The colliders are missing for 1 frame, so skip that frame
-        if colliders.0 .0.len() == 0 {
+        if colliders.0 .0.is_empty() {
             return;
         }
 
@@ -90,20 +90,61 @@ pub fn collect_balls(
             curr_toi += hit.toi;
             collided_items.insert(item_collider.entity());
             let parent = parents.get(item_collider.entity()).unwrap().0;
-            impacts.push((owner.0, rocket, parent, curr_toi));
+            impacts.push((owner.0, rocket, None, parent, curr_toi));
 
             if mines.get(parent).is_ok() {
                 break;
             }
         }
+
+        // Collision with other rockets
+        for (other, other_prev_pos, other_curr_transform, other_colliders, other_owner) in
+            rockets.iter()
+        {
+            if other_owner.0 > owner.0 {
+                let other_curr_pos = other_curr_transform.translation.xy();
+                // Account for the other rocket's motion
+                // Collider X goes a->b, and collider Y goes c->d.
+                // From Y's point of view, X goes (a - c) -> (b - d).
+                // This implies a velocity of (b - d) - (a - c) = (b - a) - (d - c)
+                // Since Y is now at d, the shapecast should start at a - c + d
+                let position = prev_pos - other_prev_pos.0 + other_curr_pos;
+                let position = Isometry::new(position.into(), 0.0);
+                let velocity = velocity - (other_curr_pos - other_prev_pos.0);
+                let groups = InteractionGroups::new(
+                    CollisionGroups::ROCKET_CAST.bits(),
+                    CollisionGroups::ROCKET.bits(),
+                );
+
+                if let Some((_, hit)) = query_pipeline.cast_shape(
+                    &collider_set,
+                    &position,
+                    &velocity.into(),
+                    &*shape.0 .0,
+                    1.0,
+                    groups,
+                    Some(&|rocket_collider| rocket_collider == other_colliders.0 .0[0]),
+                ) {
+                    impacts.push((owner.0, rocket, Some(other_owner.0), other, hit.toi));
+                }
+            }
+        }
     }
 
     // Figure out which rockets hit which items first
-    impacts.sort_by_key(|(_, _, _, toi)| Total::from(*toi));
+    impacts.sort_by_key(|(_, _, _, _, toi)| Total::from(*toi));
     let mut items_reached = FxHashSet::default();
     let mut live_rockets = vec![true; players.len()];
-    for (player_index, rocket, item, _) in impacts {
-        if live_rockets[player_index as usize] && items_reached.insert(item) {
+    for (player_index, rocket, other_player_index, item, _) in impacts {
+        if let Some(other_player_index) = other_player_index {
+            // Rocket-rocket collision. Both rockets must be alive for the collision to happen.
+            if live_rockets[player_index as usize] && live_rockets[other_player_index as usize] {
+                commands.entity(rocket).despawn_recursive();
+                commands.entity(item).despawn_recursive();
+                live_rockets[player_index as usize] = false;
+                live_rockets[other_player_index as usize] = false;
+            }
+        } else if live_rockets[player_index as usize] && items_reached.insert(item) {
             commands.entity(item).despawn_recursive();
 
             if balls.get(item).is_ok() {

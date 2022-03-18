@@ -6,7 +6,7 @@ use fxhash::FxHashMap;
 
 use crate::{
     graph::{SendFunctions, QUICK_HELP},
-    time::AdvanceTurn,
+    time::{AdvanceRound, AdvanceTurn},
     Game, Owner, PlayState, Player,
 };
 
@@ -244,7 +244,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     fn spawn_function_display(
         &mut self,
         asset_server: &Res<AssetServer>,
-        player_index: u32,
+        num_players: u32,
     ) -> &mut Self {
         let function_label_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
@@ -262,38 +262,88 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             color: Color::BLACK,
         };
 
-        self.with_children(|node| {
-            fn spawn_edge<'w, 's, 'a, 'b>(
-                node: &'b mut ChildBuilder<'w, 's, 'a>,
-            ) -> EntityCommands<'w, 's, 'b> {
-                node.spawn_bundle(NodeBundle {
+        for player_index in 0..num_players {
+            self.with_children(|node| {
+                fn spawn_edge<'w, 's, 'a, 'b>(
+                    node: &'b mut ChildBuilder<'w, 's, 'a>,
+                ) -> EntityCommands<'w, 's, 'b> {
+                    node.spawn_bundle(NodeBundle {
+                        style: Style {
+                            flex_basis: Val::Px(1.0),
+                            flex_grow: 1.0,
+                            flex_shrink: 1.0,
+                            ..Default::default()
+                        },
+                        color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                        ..Default::default()
+                    })
+                }
+
+                spawn_edge(node);
+
+                node.spawn_bundle(TextBundle {
+                    text: Text::with_section(
+                        format!("P{}'s function: (0 ≤ t ≤ 1)", player_index + 1),
+                        function_label_style.clone(),
+                        center_align,
+                    ),
                     style: Style {
-                        flex_basis: Val::Px(1.0),
-                        flex_grow: 1.0,
-                        flex_shrink: 1.0,
+                        align_self: AlignSelf::Center,
                         ..Default::default()
                     },
-                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
                     ..Default::default()
-                })
-            }
+                });
 
-            spawn_edge(node);
+                for axis in ["x", "y"] {
+                    node.spawn_bundle(NodeBundle {
+                        style: Style {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Stretch,
+                            ..Default::default()
+                        },
+                        color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                        ..Default::default()
+                    })
+                    .with_children(|node| {
+                        node.spawn_bundle(TextBundle {
+                            text: Text::with_section(
+                                format!("{}(t) = ", axis),
+                                left_side_style.clone(),
+                                center_align,
+                            ),
+                            style: Style {
+                                align_self: AlignSelf::Center,
+                                margin: Rect::all(Val::Px(2.0)),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        });
 
-            node.spawn_bundle(TextBundle {
-                text: Text::with_section(
-                    format!("P{}'s function: (0 ≤ t ≤ 1)", player_index + 1),
-                    function_label_style.clone(),
-                    center_align,
-                ),
-                style: Style {
-                    align_self: AlignSelf::Center,
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
+                        // Textbox spot
+                        node.spawn_bundle(NodeBundle {
+                            style: Style {
+                                flex_basis: Val::Percent(100.0),
+                                flex_grow: 1.0,
+                                flex_shrink: 1.0,
+                                min_size: Size::new(Val::Px(0.0), Val::Px(23.0)),
+                                margin: Rect::all(Val::Px(2.0)),
+                                ..Default::default()
+                            },
+                            color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                            ..Default::default()
+                        })
+                        .insert(Owner(player_index))
+                        .insert(FunctionDisplayBox)
+                        .maybe_insert((axis == "x").then(|| FunctionX))
+                        .maybe_insert((axis == "y").then(|| FunctionY))
+                        .insert(Textbox {
+                            text: "".to_owned(),
+                            multiline: false,
+                        })
+                        .insert(EguiId::default());
+                    });
+                }
 
-            for axis in ["x", "y"] {
                 node.spawn_bundle(NodeBundle {
                     style: Style {
                         flex_direction: FlexDirection::Row,
@@ -305,26 +355,21 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                 })
                 .with_children(|node| {
                     node.spawn_bundle(TextBundle {
-                        text: Text::with_section(
-                            format!("{}(t) = ", axis),
-                            left_side_style.clone(),
-                            center_align,
-                        ),
+                        text: Text::with_section("where ", left_side_style.clone(), center_align),
                         style: Style {
-                            align_self: AlignSelf::Center,
+                            align_self: AlignSelf::FlexEnd,
                             margin: Rect::all(Val::Px(2.0)),
                             ..Default::default()
                         },
                         ..Default::default()
                     });
 
-                    // Textbox spot
                     node.spawn_bundle(NodeBundle {
                         style: Style {
                             flex_basis: Val::Percent(100.0),
                             flex_grow: 1.0,
                             flex_shrink: 1.0,
-                            min_size: Size::new(Val::Px(0.0), Val::Px(23.0)),
+                            min_size: Size::new(Val::Px(0.0), Val::Px(72.0)),
                             margin: Rect::all(Val::Px(2.0)),
                             ..Default::default()
                         },
@@ -333,60 +378,53 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     })
                     .insert(Owner(player_index))
                     .insert(FunctionDisplayBox)
-                    .maybe_insert((axis == "x").then(|| FunctionX))
-                    .maybe_insert((axis == "y").then(|| FunctionY))
+                    .insert(FunctionWhere)
                     .insert(Textbox {
                         text: "".to_owned(),
-                        multiline: false,
+                        multiline: true,
                     })
                     .insert(EguiId::default());
                 });
-            }
 
-            node.spawn_bundle(NodeBundle {
+                spawn_edge(node);
+            });
+        }
+
+        let button_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 28.0,
+            color: Color::BLACK,
+        };
+
+        self.with_children(|node| {
+            node.spawn_bundle(ButtonBundle {
                 style: Style {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Stretch,
+                    align_self: AlignSelf::Center,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    margin: Rect {
+                        top: Val::Px(6.0),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 },
-                color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+                color: UiColor(NORMAL_BUTTON),
                 ..Default::default()
             })
+            .insert(NextRoundButton)
             .with_children(|node| {
                 node.spawn_bundle(TextBundle {
-                    text: Text::with_section("where ", left_side_style.clone(), center_align),
+                    text: Text::with_section("Next Round", button_style.clone(), center_align),
                     style: Style {
-                        align_self: AlignSelf::FlexEnd,
-                        margin: Rect::all(Val::Px(2.0)),
+                        margin: Rect::all(Val::Px(4.0)),
                         ..Default::default()
                     },
                     ..Default::default()
                 });
-
-                node.spawn_bundle(NodeBundle {
-                    style: Style {
-                        flex_basis: Val::Percent(100.0),
-                        flex_grow: 1.0,
-                        flex_shrink: 1.0,
-                        min_size: Size::new(Val::Px(0.0), Val::Px(72.0)),
-                        margin: Rect::all(Val::Px(2.0)),
-                        ..Default::default()
-                    },
-                    color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
-                    ..Default::default()
-                })
-                .insert(Owner(player_index))
-                .insert(FunctionDisplayBox)
-                .insert(FunctionWhere)
-                .insert(Textbox {
-                    text: "".to_owned(),
-                    multiline: true,
-                })
-                .insert(EguiId::default());
             });
+        });
 
-            spawn_edge(node);
-        })
+        self
     }
 }
 
@@ -444,10 +482,7 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..Default::default()
             })
             .insert(FunctionDisplay)
-            .spawn_function_display(&asset_server, 0)
-            .spawn_function_display(&asset_server, 1)
-            .spawn_function_display(&asset_server, 2)
-            .spawn_function_display(&asset_server, 3);
+            .spawn_function_display(&asset_server, 4);
 
             // Function entry
             node.spawn_bundle(NodeBundle {
@@ -471,6 +506,9 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 #[derive(Component)]
 pub struct DoneButton;
 
+#[derive(Component)]
+pub struct NextRoundButton;
+
 const NORMAL_BUTTON: Color = Color::rgb(0.85, 0.85, 0.85);
 const HOVERED_BUTTON: Color = Color::rgb(0.80, 0.80, 0.80);
 const PRESSED_BUTTON: Color = Color::rgb(0.75, 0.75, 0.75);
@@ -487,22 +525,42 @@ pub fn update_buttons(
                 Interaction::Hovered => UiColor(HOVERED_BUTTON),
                 Interaction::Clicked => UiColor(PRESSED_BUTTON),
             }
-        } else { UiColor(DISABLED_BUTTON) }
+        } else {
+            UiColor(DISABLED_BUTTON)
+        }
     }
 }
 
-pub fn update_done_buttons(
+pub fn update_done_button(
     buttons: Query<(&Interaction, &Owner), (Changed<Interaction>, With<DoneButton>)>,
     mut fire_events: EventWriter<SendFunctions>,
     buttons_enabled: Res<ButtonsEnabled>,
 ) {
-    if !buttons_enabled.0 { return; }
-    
-    for (interaction, owner) in buttons.iter() {
+    if !buttons_enabled.0 {
+        return;
+    }
+
+    if let Ok((interaction, owner)) = buttons.get_single() {
         if *interaction == Interaction::Clicked {
             fire_events.send(SendFunctions {
                 player_index: owner.0,
             });
+        }
+    }
+}
+
+pub fn update_next_round_button(
+    buttons: Query<&Interaction, (Changed<Interaction>, With<NextRoundButton>)>,
+    mut advance_round_events: EventWriter<AdvanceRound>,
+    buttons_enabled: Res<ButtonsEnabled>,
+) {
+    if !buttons_enabled.0 {
+        return;
+    }
+
+    if let Ok(interaction) = buttons.get_single() {
+        if *interaction == Interaction::Clicked {
+            advance_round_events.send(AdvanceRound);
         }
     }
 }
@@ -524,16 +582,17 @@ pub fn advance_turn(
         return;
     }
 
-    game.player_turn += 1;
-    if game.player_turn >= players.len() as u32 {
-        game.player_turn = 0;
+    game.order_index += 1;
+    if game.order_index >= players.len() as u32 {
+        game.order_index = 0;
+        game.rotate_players();
     } else {
         textboxes_editable.0 = true;
     }
     buttons_enabled.0 = true;
 
     for mut owner in owned_ui.iter_mut() {
-        owner.0 = game.player_turn;
+        owner.0 = game.player_turn();
     }
     for mut textbox in entry_textboxes.iter_mut() {
         textbox.text.clear();
@@ -541,14 +600,38 @@ pub fn advance_turn(
 
     let text = &mut status_text.single_mut();
     text.sections[0].value = " \n".into();
-    text.sections[1].value = enter_function_text(game.player_turn);
+    text.sections[1].value = enter_function_text(game.player_turn());
 
-    if game.player_turn == 0 {
+    if game.order_index == 0 {
         // All players have entered functions.
         function_ui.single_mut().display = Display::None;
         function_display.single_mut().display = Display::Flex;
         play_state.set(PlayState::Fire).unwrap();
     }
+}
+
+pub fn advance_round(
+    mut advance_round_events: EventReader<AdvanceRound>,
+    mut play_state: ResMut<State<PlayState>>,
+    mut function_ui: Query<&mut Style, With<FunctionUi>>,
+    mut function_display: Query<&mut Style, (With<FunctionDisplay>, Without<FunctionUi>)>,
+    mut textboxes_editable: ResMut<TextboxesEditable>,
+) {
+    if advance_round_events.iter().next().is_none() {
+        return;
+    }
+    play_state.set(PlayState::Enter).unwrap();
+
+    // Workaround while this is a startup system
+    function_ui
+        .get_single_mut()
+        .map(|mut ui| ui.display = Display::Flex)
+        .ok();
+    function_display
+        .get_single_mut()
+        .map(|mut ui| ui.display = Display::None)
+        .ok();
+    textboxes_editable.0 = true;
 }
 
 /// Distinguishes the UI camera from another camera
@@ -655,12 +738,10 @@ pub fn update_textboxes(
                             add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::multiline)
                         }
                     });
+                } else if textboxes_editable.0 {
+                    add_textbox(ui, &mut textbox.text, egui::TextEdit::singleline);
                 } else {
-                    if textboxes_editable.0 {
-                        add_textbox(ui, &mut textbox.text, egui::TextEdit::singleline);
-                    } else {
-                        add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::singleline);
-                    }
+                    add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::singleline);
                 }
             });
     }
