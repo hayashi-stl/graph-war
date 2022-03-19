@@ -578,6 +578,20 @@ pub fn send_functions(
     }
 }
 
+/// Labels a graph constructed by a rocket.
+#[derive(Component)]
+pub struct Graph {
+    color: Color,
+    rocket: Entity,
+}
+
+const GRAPH_COLORS: [Color; 4] = [
+    Color::RED,
+    Color::CYAN,
+    Color::YELLOW,
+    Color::GREEN,
+];
+
 pub fn fire_rockets(
     mut commands: Commands,
     mut textboxes_fx: Query<(&Owner, &mut Textbox), (With<FunctionDisplayBox>, With<FunctionX>)>,
@@ -621,7 +635,7 @@ pub fn fire_rockets(
         let start = parametric.eval(0.0);
 
         let scale = 0.3;
-        commands
+        let rocket = commands
             .spawn_bundle(SpriteBundle {
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(2.8, 1.4)),
@@ -660,6 +674,15 @@ pub fn fire_rockets(
                     .into(),
                     ..Default::default()
                 });
+            }).id();
+
+        commands.spawn()
+            .insert(Transform::identity())
+            .insert(GlobalTransform::identity())
+            .insert(*owner)
+            .insert(Graph {
+                color: GRAPH_COLORS[owner.0 as usize],
+                rocket,
             });
     }
 }
@@ -709,5 +732,36 @@ pub fn move_rockets(
 
     if !rockets_exist {
         buttons_enabled.0 = true;
+    }
+}
+
+pub fn graph_functions(
+    graphs: Query<(Entity, &Graph)>,
+    rockets: Query<(&PrevPosition, &Transform), With<Rocket>>,
+    mut commands: Commands,
+) {
+    const GRAPH_THICKNESS: f32 = 0.03;
+
+    for (entity, graph) in graphs.iter() {
+        let (prev_pos, curr_transform) = if let Ok(r) = rockets.get(graph.rocket) { r } else { continue; };
+        let prev_pos = prev_pos.0;
+        let curr_pos = curr_transform.translation.xy();
+        if prev_pos == curr_pos { continue; }
+
+        let line_pos = ((prev_pos + curr_pos) / 2.0).extend(z::GRAPH);
+        let line_rot = Quat::from_rotation_arc_2d(Vec2::X, (curr_pos - prev_pos).normalize());
+        let line_size = Vec2::new((curr_pos - prev_pos).length(), GRAPH_THICKNESS);
+        commands.entity(entity)
+            .with_children(|node| {
+                node.spawn_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        color: graph.color,
+                        custom_size: Some(line_size),
+                        ..Default::default()
+                    },
+                    transform: Transform::from_rotation(line_rot).with_translation(line_pos),
+                    ..Default::default()
+                });
+            });
     }
 }

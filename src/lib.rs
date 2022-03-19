@@ -18,7 +18,7 @@ use bevy::{
 };
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
-use graph::Parametric;
+use graph::{Parametric, Graph};
 use rand::prelude::Distribution;
 use rand_pcg::Pcg64;
 #[cfg(target_family = "wasm")]
@@ -42,7 +42,7 @@ extern "C" {
 }
 
 /// Owned by some player with the stored player index
-#[derive(Component)]
+#[derive(Copy, Clone, Debug, Component)]
 pub struct Owner(pub u32);
 
 /// Labels a player's score
@@ -82,6 +82,7 @@ pub struct Game {
     pub player_order: Vec<u32>,
     pub inverse_order: Vec<u32>,
     pub scale: f32,
+    pub rounds_left: u32,
 }
 
 impl Default for Game {
@@ -91,6 +92,7 @@ impl Default for Game {
             player_order: vec![],
             inverse_order: vec![],
             scale: 4.0,
+            rounds_left: 0,
         }
     }
 }
@@ -99,6 +101,7 @@ impl Game {
     pub fn set_num_players(&mut self, num_players: u32) {
         self.player_order = (0..num_players).collect();
         self.inverse_order = self.player_order.clone();
+        self.rounds_left = 18 / num_players.pow(2) * num_players;
     }
 
     pub fn rotate_players(&mut self) {
@@ -206,6 +209,7 @@ pub fn run() {
                 .after(PhysicsSystems::StepWorld)
                 .with_system(collision::handle_collisions)
                 .with_system(collision::collect_balls.label(Label::CollectItems))
+                .with_system(graph::graph_functions.after(Label::CollectItems))
                 .with_system(update_scores.after(Label::CollectItems)),
         )
         .add_system(
@@ -222,6 +226,7 @@ pub fn run() {
 pub mod z {
     pub const GRID: f32 = 0.0;
     pub const GRID_TEXT: f32 = 1.0;
+    pub const GRAPH: f32 = 2.0;
     pub const PLAYER: f32 = 2.0;
     pub const BALL: f32 = 2.0;
     pub const MINE: f32 = 3.0;
@@ -409,7 +414,7 @@ fn init_enter_functions(
     asset_server: Res<AssetServer>,
     mut rng: ResMut<Pcg64>,
     game: Res<Game>,
-    items: Query<Entity, Or<(With<Ball>, With<Mine>)>>,
+    items: Query<Entity, Or<(With<Ball>, With<Mine>, With<Graph>)>>,
 ) {
     for entity in items.iter() {
         commands.entity(entity).despawn_recursive();

@@ -32,7 +32,7 @@ pub fn update_prev_positions(mut positions: Query<(&mut PrevPosition, &GlobalTra
 }
 
 pub fn collect_balls(
-    rockets: Query<(
+    mut rockets: Query<(
         Entity,
         &PrevPosition,
         &mut Transform,
@@ -135,7 +135,8 @@ pub fn collect_balls(
     impacts.sort_by_key(|(_, _, _, _, toi)| Total::from(*toi));
     let mut items_reached = FxHashSet::default();
     let mut live_rockets = vec![true; players.len()];
-    for (player_index, rocket, other_player_index, item, _) in impacts {
+    let mut tois = vec![None; players.len()];
+    for (player_index, rocket, other_player_index, item, toi) in impacts {
         if let Some(other_player_index) = other_player_index {
             // Rocket-rocket collision. Both rockets must be alive for the collision to happen.
             if live_rockets[player_index as usize] && live_rockets[other_player_index as usize] {
@@ -143,6 +144,8 @@ pub fn collect_balls(
                 commands.entity(item).despawn_recursive();
                 live_rockets[player_index as usize] = false;
                 live_rockets[other_player_index as usize] = false;
+                tois[player_index as usize] = Some(toi);
+                tois[other_player_index as usize] = Some(toi);
             }
         } else if live_rockets[player_index as usize] && items_reached.insert(item) {
             commands.entity(item).despawn_recursive();
@@ -152,7 +155,16 @@ pub fn collect_balls(
             } else if mines.get(item).is_ok() {
                 commands.entity(rocket).despawn_recursive();
                 live_rockets[player_index as usize] = false;
+                tois[player_index as usize] = Some(toi);
             }
+        }
+    }
+
+    // Move despawned rockets to impact position. This is relevant for graphing
+    for (_, prev_pos, mut curr_transform, _, owner) in rockets.iter_mut() {
+        if let Some(toi) = tois[owner.0 as usize] {
+            let pos_xy = prev_pos.0.lerp(curr_transform.translation.xy(), toi);
+            curr_transform.translation = pos_xy.extend(curr_transform.translation.z);
         }
     }
 }

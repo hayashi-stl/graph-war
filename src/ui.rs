@@ -420,7 +420,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         ..Default::default()
                     },
                     ..Default::default()
-                });
+                }).insert(NextRoundText);
             });
         });
 
@@ -508,6 +508,9 @@ pub struct DoneButton;
 
 #[derive(Component)]
 pub struct NextRoundButton;
+
+#[derive(Component)]
+pub struct NextRoundText;
 
 const NORMAL_BUTTON: Color = Color::rgb(0.85, 0.85, 0.85);
 const HOVERED_BUTTON: Color = Color::rgb(0.80, 0.80, 0.80);
