@@ -19,8 +19,9 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
 use graph::{Parametric, Graph};
-use rand::prelude::Distribution;
+use rand::{prelude::Distribution, distributions::Uniform};
 use rand_pcg::Pcg64;
+use rand::SeedableRng;
 #[cfg(target_family = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -82,7 +83,9 @@ pub struct Game {
     pub player_order: Vec<u32>,
     pub inverse_order: Vec<u32>,
     pub scale: f32,
-    pub rounds_left: u32,
+    /// this is 1-indexed to simplify advance_round
+    pub round_index: u32,
+    pub num_rounds: u32,
 }
 
 impl Default for Game {
@@ -92,7 +95,8 @@ impl Default for Game {
             player_order: vec![],
             inverse_order: vec![],
             scale: 4.0,
-            rounds_left: 0,
+            round_index: 0,
+            num_rounds: 0,
         }
     }
 }
@@ -101,12 +105,12 @@ impl Game {
     pub fn set_num_players(&mut self, num_players: u32) {
         self.player_order = (0..num_players).collect();
         self.inverse_order = self.player_order.clone();
-        self.rounds_left = 18 / num_players.pow(2) * num_players;
+        self.num_rounds = 1;//18 / num_players.pow(2) * num_players;
     }
 
     pub fn rotate_players(&mut self) {
-        self.player_order.rotate_left(1);
-        self.inverse_order.rotate_right(1);
+        //self.player_order.rotate_left(1);
+        //self.inverse_order.rotate_right(1);
     }
 
     /// Whose turn it is
@@ -117,6 +121,14 @@ impl Game {
     /// When a player goes
     pub fn order_index(&self, player: u32) -> u32 {
         self.inverse_order[player as usize]
+    }
+
+    pub fn is_on_last_normal_round(&self) -> bool {
+        self.round_index == self.num_rounds
+    }
+
+    pub fn is_on_destruction_round(&self) -> bool {
+        self.round_index == self.num_rounds + 1
     }
 }
 
@@ -132,6 +144,7 @@ enum Label {
     AdvanceTurn,
     MovePlayers,
     MoveRockets,
+    SeedRng,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, StageLabel)]
@@ -150,10 +163,7 @@ pub fn run() {
     App::new()
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(ui::IdLender::default())
-        .insert_resource(Pcg64::new(
-            0xcafef00dd15ea5e5,
-            0xa02bdbf7bb3c0a7ac28fa16a64abf96,
-        ))
+        .insert_resource(Pcg64::new(0, 0))
         .insert_resource(vec![Player::default(); 0])
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
@@ -172,8 +182,9 @@ pub fn run() {
             Stage::AdvanceTimers,
             SystemStage::single_threaded(),
         )
-        .add_startup_system(ui::setup_egui.label(Label::Setup))
-        .add_startup_system(ui::load_ui.label(Label::Setup))
+        .add_startup_system(seed_rng.label(Label::SeedRng))
+        .add_startup_system(ui::setup_egui.label(Label::Setup).after(Label::SeedRng))
+        .add_startup_system(ui::load_ui.label(Label::Setup).after(Label::SeedRng))
         .add_startup_system(load_field.label(Label::LoadField).after(Label::Setup))
         .add_startup_system(ui::advance_round.after(Label::LoadField))
         .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
@@ -232,6 +243,17 @@ pub mod z {
     pub const MINE: f32 = 3.0;
     pub const ROCKET: f32 = 4.0;
     pub const SCORE: f32 = 5.0;
+}
+
+fn seed_rng(
+    mut pcg: ResMut<Pcg64>,
+) {
+    let mut rng = rand::thread_rng();
+    let mut seed = [0u8; 32];
+    seed[0..16].copy_from_slice(&Uniform::from(0..=u128::MAX).sample(&mut rng).to_le_bytes());
+    seed[16..32].copy_from_slice(&Uniform::from(0..=u128::MAX).sample(&mut rng).to_le_bytes());
+    log::info!("RNG seed: {:02x?}", seed);
+    *pcg = Pcg64::from_seed(seed);
 }
 
 pub fn load_field(
@@ -409,11 +431,50 @@ fn move_players(
     }
 }
 
+enum TexFn<'a> {
+    Str(&'a str),
+    Between(&'a str, &'a str),
+}
+
+impl<'a> TexFn<'a> {
+    fn call(&self, param: u32) -> String {
+        match self {
+            Self::Str(s) => (*s).into(),
+            Self::Between(s, t) => format!("{}{}{}", s, param, t)
+        }
+    }
+}
+
+struct ItemParams {
+    texture: TexFn<'static>,
+    scale_multiplier: f32,
+    interaction_layers: CollisionGroups,
+}
+
+const ITEM_BALL: ItemParams = ItemParams {
+    texture: TexFn::Str("ball.png"),
+    scale_multiplier: 1.375,
+    interaction_layers: CollisionGroups::BALL,
+};
+
+const ITEM_MINE: ItemParams = ItemParams {
+    texture: TexFn::Str("mine.png"),
+    scale_multiplier: 1.375,
+    interaction_layers: CollisionGroups::MINE,
+};
+
+const ITEM_PLAYER_BALL: ItemParams = ItemParams {
+    texture: TexFn::Between("player", ".png"),
+    scale_multiplier: 1.0,
+    interaction_layers: CollisionGroups::BALL,
+};
+
 fn init_enter_functions(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut rng: ResMut<Pcg64>,
     game: Res<Game>,
+    players: Res<Vec<Player>>,
     items: Query<Entity, Or<(With<Ball>, With<Mine>, With<Graph>)>>,
 ) {
     for entity in items.iter() {
@@ -436,7 +497,8 @@ fn init_enter_functions(
         commands: &'a mut Commands<'w, 's>,
         asset_server: &Res<AssetServer>,
         point: Vec3,
-        item_type: usize,
+        item_params: &ItemParams,
+        param: u32,
     ) -> EntityCommands<'w, 's, 'a> {
         let scale = 0.3;
 
@@ -445,9 +507,9 @@ fn init_enter_functions(
                 custom_size: Some(Vec2::ONE),
                 ..Default::default()
             },
-            texture: asset_server.load(["ball.png", "mine.png"][item_type]),
+            texture: asset_server.load(&item_params.texture.call(param)),
             transform: Transform::from_translation(point)
-                .with_scale(Vec3::from([scale * 1.375; 3])),
+                .with_scale(Vec3::from([scale * item_params.scale_multiplier; 3])),
             ..Default::default()
         });
         entity_commands
@@ -463,7 +525,7 @@ fn init_enter_functions(
                     position: Vec2::ZERO.into(),
                     flags: ColliderFlags {
                         collision_groups: InteractionGroups::new(
-                            [CollisionGroups::BALL, CollisionGroups::MINE][item_type].bits(),
+                            item_params.interaction_layers.bits(),
                             CollisionGroups::ROCKET_CAST.bits(),
                         ),
                         ..Default::default()
@@ -475,13 +537,26 @@ fn init_enter_functions(
         entity_commands
     }
 
-    let points = item_distribution.clone().sample_iter(&mut *rng);
-    for point in points.take(85) {
-        spawn_item(&mut commands, &asset_server, point.extend(z::BALL), 0).insert(Ball);
-    }
-    let points = item_distribution.sample_iter(&mut *rng);
-    for point in points.take(15) {
-        spawn_item(&mut commands, &asset_server, point.extend(z::MINE), 1).insert(Mine);
+    if game.is_on_destruction_round() {
+        for (i, player) in players.iter().enumerate() {
+            let points = (&item_distribution).sample_iter(&mut *rng);
+            for point in points.take(player.num_balls as usize) {
+                spawn_item(&mut commands, &asset_server, point.extend(z::BALL), &ITEM_PLAYER_BALL, i as u32 + 1)
+                    .insert(Owner(i as u32))
+                    .insert(Ball);
+            }
+        }
+    } else {
+        let points = (&item_distribution).sample_iter(&mut *rng);
+        for point in points.take(85) {
+            spawn_item(&mut commands, &asset_server, point.extend(z::BALL), &ITEM_BALL, 0)
+                .insert(Ball);
+        }
+        let points = (&item_distribution).sample_iter(&mut *rng);
+        for point in points.take(15) {
+            spawn_item(&mut commands, &asset_server, point.extend(z::MINE), &ITEM_MINE, 0)
+                .insert(Mine);
+        }
     }
 }
 

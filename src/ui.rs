@@ -580,6 +580,7 @@ pub fn advance_turn(
     mut buttons_enabled: ResMut<ButtonsEnabled>,
     mut function_ui: Query<&mut Style, With<FunctionUi>>,
     mut function_display: Query<&mut Style, (With<FunctionDisplay>, Without<FunctionUi>)>,
+    mut next_round_text: Query<&mut Text, (With<NextRoundText>, Without<FunctionStatus>)>,
 ) {
     if advance_turn_events.iter().next().is_none() {
         return;
@@ -610,10 +611,21 @@ pub fn advance_turn(
         function_ui.single_mut().display = Display::None;
         function_display.single_mut().display = Display::Flex;
         play_state.set(PlayState::Fire).unwrap();
+
+        let round_text = if game.is_on_destruction_round() {
+            "End Game".to_owned()
+        } else if game.is_on_last_normal_round() {
+            "To Final Round (Destruction)".to_owned()
+        } else {
+            format!("To Next Round ({} of {})", game.round_index + 1, game.num_rounds)
+        };
+
+        next_round_text.single_mut().sections[0].value = round_text;
     }
 }
 
 pub fn advance_round(
+    mut game: ResMut<Game>,
     mut advance_round_events: EventReader<AdvanceRound>,
     mut play_state: ResMut<State<PlayState>>,
     mut function_ui: Query<&mut Style, With<FunctionUi>>,
@@ -623,6 +635,7 @@ pub fn advance_round(
     if advance_round_events.iter().next().is_none() {
         return;
     }
+    game.round_index += 1;
     play_state.set(PlayState::Enter).unwrap();
 
     // Workaround while this is a startup system

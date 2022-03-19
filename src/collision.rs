@@ -39,6 +39,7 @@ pub fn collect_balls(
         &RigidBodyCollidersComponent,
         &Owner,
     )>,
+    owned: Query<&Owner>,
     query_pipeline: Res<QueryPipeline>,
     collider_query: QueryPipelineColliderComponentsQuery,
     collider_shapes: Query<&ColliderShapeComponent>,
@@ -151,7 +152,13 @@ pub fn collect_balls(
             commands.entity(item).despawn_recursive();
 
             if balls.get(item).is_ok() {
-                players[player_index as usize].num_balls += 1;
+                if let Ok(owner) = owned.get(item) {
+                    // Destruction round
+                    players[owner.0 as usize].num_balls -= 1;
+                } else {
+                    // Normal round
+                    players[player_index as usize].num_balls += 1;
+                }
             } else if mines.get(item).is_ok() {
                 commands.entity(rocket).despawn_recursive();
                 live_rockets[player_index as usize] = false;
