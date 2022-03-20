@@ -577,16 +577,22 @@ pub fn fire_rockets(
     field: Query<Entity, With<Field>>,
 ) {
     for (owner, mut textbox) in textboxes_fx.iter_mut() {
-        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
-        textbox.text = parametric.source_x.take().unwrap();
+        if let Some(player) = players.get_mut(owner.0 as usize) {
+            let parametric = player.parametric.as_mut().unwrap();
+            textbox.text = parametric.source_x.take().unwrap();
+        }
     }
     for (owner, mut textbox) in textboxes_fy.iter_mut() {
-        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
-        textbox.text = parametric.source_y.take().unwrap();
+        if let Some(player) = players.get_mut(owner.0 as usize) {
+            let parametric = player.parametric.as_mut().unwrap();
+            textbox.text = parametric.source_y.take().unwrap();
+        }
     }
     for (owner, mut textbox) in textboxes_where.iter_mut() {
-        let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
-        textbox.text = parametric.source_assigns.take().unwrap();
+        if let Some(player) = players.get_mut(owner.0 as usize) {
+            let parametric = player.parametric.as_mut().unwrap();
+            textbox.text = parametric.source_assigns.take().unwrap();
+        }
     }
 
     commands.entity(field.single()).with_children(|node| {

@@ -7,7 +7,7 @@ use fxhash::FxHashMap;
 use crate::{
     graph::{SendFunctions, QUICK_HELP},
     time::{AdvanceRound, AdvanceTurn},
-    Game, Owner, PlayState, Player,
+    Field, Game, Owner, PlayState, Player,
 };
 
 const FONT_SIZE: f32 = 18.0;
@@ -313,8 +313,9 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             self.with_children(|node| {
                 fn spawn_edge<'w, 's, 'a, 'b>(
                     node: &'b mut ChildBuilder<'w, 's, 'a>,
+                    player_index: u32,
                 ) -> EntityCommands<'w, 's, 'b> {
-                    node.spawn_bundle(NodeBundle {
+                    let mut commands = node.spawn_bundle(NodeBundle {
                         style: Style {
                             flex_basis: Val::Px(1.0),
                             flex_grow: 1.0,
@@ -323,10 +324,12 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         },
                         color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
                         ..Default::default()
-                    })
+                    });
+                    commands.insert(PlayerFunctionDisplay::new(player_index));
+                    commands
                 }
 
-                spawn_edge(node);
+                spawn_edge(node, player_index);
 
                 node.spawn_bundle(TextBundle {
                     text: Text::with_section(
@@ -336,7 +339,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     ),
                     style: Style { align_self: AlignSelf::Center, ..Default::default() },
                     ..Default::default()
-                });
+                })
+                .insert(PlayerFunctionDisplay::new(player_index));
 
                 for axis in ["x", "y"] {
                     node.spawn_bundle(NodeBundle {
@@ -382,7 +386,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         .maybe_insert((axis == "y").then(|| FunctionY))
                         .insert(Textbox { text: "".to_owned(), multiline: false })
                         .insert(EguiId::default());
-                    });
+                    })
+                    .insert(PlayerFunctionDisplay::new(player_index));
                 }
 
                 node.spawn_bundle(NodeBundle {
@@ -422,9 +427,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(FunctionWhere)
                     .insert(Textbox { text: "".to_owned(), multiline: true })
                     .insert(EguiId::default());
-                });
+                })
+                .insert(PlayerFunctionDisplay::new(player_index));
 
-                spawn_edge(node);
+                spawn_edge(node, player_index);
             });
         }
 
@@ -578,17 +584,28 @@ pub fn update_buttons(
 pub fn update_play_button(
     buttons: Query<(&Interaction, &PlayButton), Changed<Interaction>>,
     mut play_state: ResMut<State<PlayState>>,
+    mut players: ResMut<Vec<Player>>,
     mut game: ResMut<Game>,
     mut menu_screen: Query<&mut Style, With<MenuScreen>>,
     mut game_screen: Query<&mut Style, (With<GameScreen>, Without<MenuScreen>)>,
+    mut displays: Query<
+        (&mut Style, &PlayerFunctionDisplay),
+        (Without<GameScreen>, Without<MenuScreen>),
+    >,
 ) {
     // Play buttons are always enabled when they exist.
     if let Some((interaction, PlayButton { num_players })) = buttons.iter().next() {
         if *interaction == Interaction::Clicked {
             game.set_num_players(*num_players);
+            *players = vec![Player::default(); *num_players as usize];
             play_state.set(PlayState::Load).ok();
             menu_screen.single_mut().display = Display::None;
             game_screen.single_mut().display = Display::Flex;
+
+            for (mut style, PlayerFunctionDisplay { player_index }) in displays.iter_mut() {
+                style.display =
+                    if player_index < num_players { Display::Flex } else { Display::None };
+            }
         }
     }
 }
@@ -613,6 +630,8 @@ pub fn update_next_round_button(
     buttons: Query<&Interaction, (Changed<Interaction>, With<NextRoundButton>)>,
     mut advance_round_events: EventWriter<AdvanceRound>,
     buttons_enabled: Res<ButtonsEnabled>,
+    game: Res<Game>,
+    mut play_state: ResMut<State<PlayState>>,
 ) {
     if !buttons_enabled.0 {
         return;
@@ -620,8 +639,25 @@ pub fn update_next_round_button(
 
     if let Ok(interaction) = buttons.get_single() {
         if *interaction == Interaction::Clicked {
-            advance_round_events.send(AdvanceRound);
+            if game.is_on_destruction_round() {
+                play_state.set(PlayState::Menu).unwrap();
+            } else {
+                advance_round_events.send(AdvanceRound);
+            }
         }
+    }
+}
+
+pub fn show_menu(
+    mut menu_screen: Query<&mut Style, With<MenuScreen>>,
+    mut game_screen: Query<&mut Style, (With<GameScreen>, Without<MenuScreen>)>,
+    field: Query<Entity, With<Field>>,
+    mut commands: Commands,
+) {
+    menu_screen.single_mut().display = Display::Flex;
+    game_screen.single_mut().display = Display::None;
+    for entity in field.iter() {
+        commands.entity(entity).despawn_recursive();
     }
 }
 
@@ -695,7 +731,6 @@ pub fn advance_round(
     game.round_index += 1;
     play_state.set(PlayState::Enter).unwrap();
 
-    // Workaround while this is a startup system
     function_ui.get_single_mut().map(|mut ui| ui.display = Display::Flex).ok();
     function_display.get_single_mut().map(|mut ui| ui.display = Display::None).ok();
     textboxes_editable.0 = true;
@@ -722,6 +757,18 @@ pub struct FunctionUi;
 /// Labels the function display UI
 #[derive(Component)]
 pub struct FunctionDisplay;
+
+/// Labels a player's function display UI component
+#[derive(Component)]
+pub struct PlayerFunctionDisplay {
+    pub player_index: u32,
+}
+
+impl PlayerFunctionDisplay {
+    fn new(player_index: u32) -> Self {
+        Self { player_index }
+    }
+}
 
 pub fn setup_egui(mut egui_ctx: ResMut<EguiContext>) {
     let mut style = (*egui_ctx.ctx_mut().style()).clone();

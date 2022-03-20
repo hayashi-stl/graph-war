@@ -7,11 +7,16 @@ use rand::prelude::Distribution;
 #[derive(Clone, Debug)]
 pub struct RectRegion {
     rects: Vec<(Rect<f32>, f32)>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ScaledRectRegion<'a> {
+    region: &'a RectRegion,
     scale: f32,
 }
 
 impl RectRegion {
-    pub fn new(rects: &[Rect<f32>], scale: f32) -> Self {
+    pub fn new(rects: &[Rect<f32>]) -> Self {
         let mut sum_areas = 0.0;
         let mut rects = rects
             .iter()
@@ -26,19 +31,24 @@ impl RectRegion {
             *cdf /= sum_areas;
         }
 
-        Self { rects, scale }
+        Self { rects }
+    }
+
+    pub fn scaled(&self, scale: f32) -> ScaledRectRegion {
+        ScaledRectRegion { region: self, scale }
     }
 }
 
-impl Distribution<Vec2> for RectRegion {
+impl<'a> Distribution<Vec2> for ScaledRectRegion<'a> {
     fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Vec2 {
         let rect_select = rng.gen_range(0f32..1f32);
         let rect_index = self
+            .region
             .rects
             .binary_search_by_key(&Total::from(rect_select), |(_, cdf)| Total::from(*cdf));
         let rect = match rect_index {
-            Ok(index) => self.rects[index].0,
-            Err(index) => self.rects[index - 1].0,
+            Ok(index) => self.region.rects[index].0,
+            Err(index) => self.region.rects[index - 1].0,
         };
 
         let x = rng.gen_range(rect.left..rect.right);

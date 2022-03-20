@@ -11,7 +11,7 @@ pub mod time;
 pub mod ui;
 
 use bevy::{
-    ecs::system::EntityCommands,
+    ecs::{schedule::ShouldRun, system::EntityCommands},
     math::{Mat2, Vec3Swizzles},
     prelude::*,
     render::camera::ScalingMode,
@@ -19,6 +19,7 @@ use bevy::{
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
 use graph::{Graph, Parametric};
+use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand::{distributions::Uniform, prelude::Distribution};
 use rand_pcg::Pcg64;
@@ -115,9 +116,15 @@ impl Default for Game {
 
 impl Game {
     pub fn set_num_players(&mut self, num_players: u32) {
+        self.order_index = 0;
         self.player_order = (0..num_players).collect();
         self.inverse_order = self.player_order.clone();
+        self.round_index = 0;
         self.num_rounds = 1; //18 / num_players.pow(2) * num_players;
+    }
+
+    pub fn num_players(&self) -> u32 {
+        self.player_order.len() as u32
     }
 
     pub fn rotate_players(&mut self) {
@@ -180,7 +187,7 @@ pub fn run() {
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
         .insert_resource(ui::ButtonsEnabled(true))
-        .insert_resource(PrevWindowHeight(0.0))
+        .insert_resource(PrevWindowSize([0.0, 0.0]))
         .add_state(PlayState::Menu)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
@@ -201,8 +208,9 @@ pub fn run() {
         .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
         .add_system_to_stage(CoreStage::PreUpdate, ui::update_buttons)
         .add_system_to_stage(CoreStage::PreUpdate, collision::update_prev_positions)
-        .add_system(resize)
+        .add_system(resize.with_run_criteria(resized))
         .add_system(ui::update_textboxes)
+        .add_system_set(SystemSet::on_enter(PlayState::Menu).with_system(ui::show_menu))
         .add_system_set(SystemSet::on_update(PlayState::Menu).with_system(ui::update_play_button))
         .add_system_set(
             SystemSet::on_enter(PlayState::Load)
@@ -258,6 +266,67 @@ pub mod z {
     pub const SCORE: f32 = 5.0;
 }
 
+/// Configuration for a field, containing player positions
+/// and spots where items can go
+struct FieldConfig {
+    positions: Vec<Vec2>,
+    item_region: RectRegion,
+}
+
+#[rustfmt::skip]
+static FIELD_CONFIGS: Lazy<[FieldConfig; 5]> = Lazy::new(|| [
+    FieldConfig {
+        positions: vec![],
+        item_region: RectRegion::new(&[])
+    },
+
+    // 1 player is invalid for now at least
+    FieldConfig {
+        positions: vec![],
+        item_region: RectRegion::new(&[])
+    },
+
+    FieldConfig {
+        positions: vec![
+            [-0.75,  0.75].into(),
+            [ 0.75, -0.75].into(),
+        ],
+        item_region: RectRegion::new(&[
+            Rect { left: -0.875, right:  0.5,   bottom: -0.875, top: -0.5,   },
+            Rect { left: -0.5,   right:  0.875, bottom:  0.5,   top:  0.875, },
+            Rect { left: -0.875, right:  0.875, bottom: -0.5,   top:  0.5,   },
+        ])
+    },
+
+    FieldConfig {
+        positions: vec![
+            [-0.75,  0.75].into(),
+            [-0.75, -0.75].into(),
+            [ 0.75,  0.0 ].into(),
+        ],
+        item_region: RectRegion::new(&[
+            Rect { left: -0.875, right: -0.5,   bottom: -0.5,   top:  0.5,   },
+            Rect { left: -0.5,   right:  0.5,   bottom: -0.875, top:  0.875, },
+        ])
+    },
+
+    FieldConfig {
+        positions: vec![
+            [-0.75,  0.75].into(),
+            [-0.75, -0.75].into(),
+            [ 0.75,  0.75].into(),
+            [ 0.75, -0.75].into(),
+        ],
+        item_region: RectRegion::new(&[
+            Rect { left: -0.875, right: -0.5,   bottom: -0.5,   top:  0.5,   },
+            Rect { left:  0.5,   right:  0.875, bottom: -0.5,   top:  0.5,   },
+            Rect { left: -0.5,   right:  0.5,   bottom: -0.875, top: -0.5,   },
+            Rect { left: -0.5,   right:  0.5,   bottom:  0.5,   top:  0.875, },
+            Rect { left: -0.5,   right:  0.5,   bottom: -0.5,   top:  0.5,   },
+        ])
+    },
+]);
+
 fn seed_rng(mut pcg: ResMut<Pcg64>) {
     let mut rng = rand::thread_rng();
     let mut seed = [0u8; 32];
@@ -270,8 +339,7 @@ fn seed_rng(mut pcg: ResMut<Pcg64>) {
 pub fn load_field(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut players: ResMut<Vec<Player>>,
-    mut game: ResMut<Game>,
+    game: ResMut<Game>,
     mut advance_round_events: EventWriter<AdvanceRound>,
 ) {
     const AXIS_THICKNESS: f32 = 0.04;
@@ -360,19 +428,13 @@ pub fn load_field(
         let score_alignment =
             TextAlignment { vertical: VerticalAlign::Center, horizontal: HorizontalAlign::Center };
 
-        let positions = [
-            [-3.0, 3.0, z::PLAYER],
-            [-3.0, -3.0, z::PLAYER],
-            [3.0, 3.0, z::PLAYER],
-            [3.0, -3.0, z::PLAYER],
-        ];
-
-        for (i, pos) in positions.into_iter().enumerate() {
+        let positions = &FIELD_CONFIGS[game.num_players() as usize].positions;
+        for (i, pos) in positions.iter().enumerate() {
             // Player icon
             node.spawn_bundle(SpriteBundle {
                 sprite: Sprite { custom_size: Some(Vec2::ONE), ..Default::default() },
                 texture: asset_server.load(&format!("player{}.png", i + 1)),
-                transform: Transform::from_translation(Vec3::from(pos))
+                transform: Transform::from_translation((*pos * scale).extend(z::PLAYER))
                     .with_scale(Vec3::from([0.4; 3])),
                 ..Default::default()
             })
@@ -382,16 +444,12 @@ pub fn load_field(
             // Score
             node.spawn_bundle(Text2dBundle {
                 text: Text::with_section("0", score_style.clone(), score_alignment),
-                transform: Transform::from_translation(
-                    (Vec2::new(pos[0], pos[1]) * 3.4 / 3.0).extend(z::SCORE),
-                ),
+                transform: Transform::from_translation((*pos * scale * 3.4 / 3.0).extend(z::SCORE)),
                 ..Default::default()
             })
             .insert(RelativeTextSize(0.4))
             .insert(Owner(i as u32))
             .insert(Score);
-
-            players.push(Player::default());
         }
     });
 
@@ -403,18 +461,15 @@ fn move_players(
     mut player_comps: Query<(&Owner, &mut Transform), With<PlayerLabel>>,
     mut scores: Query<(&Owner, &mut Transform), (With<Score>, Without<PlayerLabel>)>,
 ) {
-    let positions = [
-        [-3.0, 3.0, z::PLAYER],
-        [-3.0, -3.0, z::PLAYER],
-        [3.0, 3.0, z::PLAYER],
-        [3.0, -3.0, z::PLAYER],
-    ];
+    let positions = &FIELD_CONFIGS[game.num_players() as usize].positions;
     for (owner, mut transform) in player_comps.iter_mut() {
-        transform.translation = positions[game.order_index(owner.0) as usize].into();
+        transform.translation =
+            (positions[game.order_index(owner.0) as usize] * game.scale).extend(z::PLAYER);
     }
     for (owner, mut transform) in scores.iter_mut() {
-        transform.translation = positions[game.order_index(owner.0) as usize].into();
-        transform.translation *= 3.4 / 3.0;
+        transform.translation = (positions[game.order_index(owner.0) as usize] * game.scale * 3.4
+            / 3.0)
+            .extend(z::PLAYER);
     }
 }
 
@@ -469,17 +524,8 @@ fn init_enter_functions(
         commands.entity(entity).despawn_recursive();
     }
 
-    #[rustfmt::skip]
-    let item_distribution = RectRegion::new(
-        &[
-            Rect { left: -0.875, right: -0.5,   bottom: -0.5,   top:  0.5,   },
-            Rect { left:  0.5,   right:  0.875, bottom: -0.5,   top:  0.5,   },
-            Rect { left: -0.5,   right:  0.5,   bottom: -0.875, top: -0.5,   },
-            Rect { left: -0.5,   right:  0.5,   bottom:  0.5,   top:  0.875, },
-            Rect { left: -0.5,   right:  0.5,   bottom: -0.5,   top:  0.5,   },
-        ],
-        game.scale,
-    );
+    let item_region = &FIELD_CONFIGS[game.num_players() as usize].item_region;
+    let item_distribution = item_region.scaled(game.scale);
 
     fn spawn_item<'a, 'w, 's, 'b>(
         node: &'b mut ChildBuilder<'w, 's, 'a>,
@@ -561,36 +607,37 @@ fn update_scores(mut scores: Query<(&mut Text, &Owner), With<Score>>, players: R
 #[derive(Component)]
 pub struct RelativeTextSize(pub f32);
 
-//fn resized(
-//    mut resize_events: EventReader<WindowResized>,
-//    new_cameras: Query<&OrthographicProjection, Added<OrthographicProjection>>,
-//) -> ShouldRun {
-//    if resize_events.iter().next().is_some() || !new_cameras.is_empty() {
-//        ShouldRun::Yes
-//    } else {
-//        ShouldRun::No
-//    }
-//}
+fn resized(
+    prev_height: Res<PrevWindowSize>,
+    windows: Res<Windows>,
+    added: Query<(), Or<(Added<Node>, Added<Text>, Added<OrthographicProjection>)>>,
+) -> ShouldRun {
+    let window = windows.get_primary().unwrap();
+    if [window.width(), window.height()] != prev_height.0 || added.iter().next().is_some() {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
+    }
+}
 
-struct PrevWindowHeight(f32);
+struct PrevWindowSize([f32; 2]);
 
 fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
     mut graph_node: Query<(&mut Style, With<ui::GraphNode>)>,
     mut camera: Query<&mut OrthographicProjection, Without<ui::UiCamera>>,
     windows: Res<Windows>,
-    mut prev_height: ResMut<PrevWindowHeight>,
+    mut prev_height: ResMut<PrevWindowSize>,
 ) {
     let width = windows.get_primary().unwrap().width() as f32;
     let height = windows.get_primary().unwrap().height() as f32;
     let aspect_ratio = width / height;
+    prev_height.0 = [width, height];
     //windows.get_primary_mut().unwrap().set_resolution(aspect_ratio * 720.0, 720.0);
     //windows.get_primary_mut().unwrap().set_scale_factor_override(Some(height as f64 / 720.0));
 
-    if height != prev_height.0 {
-        for (mut style, _) in graph_node.iter_mut() {
-            style.flex_basis = Val::Px(height);
-        }
+    for (mut style, _) in graph_node.iter_mut() {
+        style.flex_basis = Val::Px(height);
     }
 
     let mut camera = if let Ok(camera) = camera.get_single_mut() { camera } else { return };
@@ -601,16 +648,12 @@ fn resize(
     camera.top = 1.0;
     camera.bottom = -1.0;
 
-    if height != prev_height.0 {
-        for (mut text, mut transform, size, _) in query.iter_mut() {
-            for section in text.sections.iter_mut() {
-                section.style.font_size = size.0 * height / (2.0 * scale);
-            }
-            transform.scale = Vec3::from([2.0 * scale / height; 3]);
+    for (mut text, mut transform, size, _) in query.iter_mut() {
+        for section in text.sections.iter_mut() {
+            section.style.font_size = size.0 * height / (2.0 * scale);
         }
+        transform.scale = Vec3::from([2.0 * scale / height; 3]);
     }
-
-    prev_height.0 = height;
 }
 
 #[cfg(target_family = "wasm")]
