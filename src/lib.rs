@@ -180,6 +180,7 @@ pub fn run() {
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
         .insert_resource(ui::ButtonsEnabled(true))
+        .insert_resource(PrevWindowHeight(0.0))
         .add_state(PlayState::Menu)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
@@ -571,11 +572,14 @@ pub struct RelativeTextSize(pub f32);
 //    }
 //}
 
+struct PrevWindowHeight(f32);
+
 fn resize(
     mut query: Query<(&mut Text, &mut Transform, &RelativeTextSize, Without<Node>)>,
     mut graph_node: Query<(&mut Style, With<ui::GraphNode>)>,
     mut camera: Query<&mut OrthographicProjection, Without<ui::UiCamera>>,
     windows: Res<Windows>,
+    mut prev_height: ResMut<PrevWindowHeight>,
 ) {
     let width = windows.get_primary().unwrap().width() as f32;
     let height = windows.get_primary().unwrap().height() as f32;
@@ -583,8 +587,10 @@ fn resize(
     //windows.get_primary_mut().unwrap().set_resolution(aspect_ratio * 720.0, 720.0);
     //windows.get_primary_mut().unwrap().set_scale_factor_override(Some(height as f64 / 720.0));
 
-    for (mut style, _) in graph_node.iter_mut() {
-        style.flex_basis = Val::Px(height);
+    if height != prev_height.0 {
+        for (mut style, _) in graph_node.iter_mut() {
+            style.flex_basis = Val::Px(height);
+        }
     }
 
     let mut camera = if let Ok(camera) = camera.get_single_mut() { camera } else { return };
@@ -595,12 +601,16 @@ fn resize(
     camera.top = 1.0;
     camera.bottom = -1.0;
 
-    for (mut text, mut transform, size, _) in query.iter_mut() {
-        for section in text.sections.iter_mut() {
-            section.style.font_size = size.0 * height / (2.0 * scale);
+    if height != prev_height.0 {
+        for (mut text, mut transform, size, _) in query.iter_mut() {
+            for section in text.sections.iter_mut() {
+                section.style.font_size = size.0 * height / (2.0 * scale);
+            }
+            transform.scale = Vec3::from([2.0 * scale / height; 3]);
         }
-        transform.scale = Vec3::from([2.0 * scale / height; 3]);
     }
+
+    prev_height.0 = height;
 }
 
 #[cfg(target_family = "wasm")]
