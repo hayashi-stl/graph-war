@@ -24,10 +24,7 @@ pub struct DelayedEventBundle {
 impl DelayedEventBundle {
     /// `delay` is in seconds
     pub fn new(delay: f32, event: DelayedEvent) -> Self {
-        Self {
-            timer: Timer::new(Duration::from_secs_f32(delay), false),
-            event,
-        }
+        Self { timer: Timer::new(Duration::from_secs_f32(delay), false), event }
     }
 }
 

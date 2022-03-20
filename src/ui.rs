@@ -59,10 +59,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             color: Color::BLACK,
         };
 
-        let center_align = TextAlignment {
-            horizontal: HorizontalAlign::Center,
-            vertical: VerticalAlign::Center,
-        };
+        let center_align =
+            TextAlignment { horizontal: HorizontalAlign::Center, vertical: VerticalAlign::Center };
 
         self.insert_bundle(NodeBundle {
             style: Style {
@@ -84,10 +82,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         })
         .with_children(|node| {
             node.spawn_bundle(ImageBundle {
-                style: Style {
-                    margin: Rect::all(Val::Px(10.0)),
-                    ..Default::default()
-                },
+                style: Style { margin: Rect::all(Val::Px(10.0)), ..Default::default() },
                 image: UiImage(asset_server.load("title.png")),
                 ..Default::default()
             });
@@ -112,10 +107,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                             button_style.clone(),
                             center_align,
                         ),
-                        style: Style {
-                            margin: Rect::all(Val::Px(4.0)),
-                            ..Default::default()
-                        },
+                        style: Style { margin: Rect::all(Val::Px(4.0)), ..Default::default() },
                         ..Default::default()
                     });
                 });
@@ -133,10 +125,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
-        let center_align = TextAlignment {
-            horizontal: HorizontalAlign::Center,
-            vertical: VerticalAlign::Center,
-        };
+        let center_align =
+            TextAlignment { horizontal: HorizontalAlign::Center, vertical: VerticalAlign::Center };
 
         let left_side_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
@@ -167,10 +157,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                 },
                 style: Style {
                     align_self: AlignSelf::Center,
-                    margin: Rect {
-                        top: Val::Px(15.0),
-                        ..Default::default()
-                    },
+                    margin: Rect { top: Val::Px(15.0), ..Default::default() },
                     ..Default::default()
                 },
                 ..Default::default()
@@ -219,10 +206,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(FunctionEntryBox)
                     .maybe_insert((axis == "x").then(|| FunctionX))
                     .maybe_insert((axis == "y").then(|| FunctionY))
-                    .insert(Textbox {
-                        text: "".to_owned(),
-                        multiline: false,
-                    })
+                    .insert(Textbox { text: "".to_owned(), multiline: false })
                     .insert(EguiId::default());
                 });
             }
@@ -262,10 +246,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                 .insert(Owner(player_index))
                 .insert(FunctionEntryBox)
                 .insert(FunctionWhere)
-                .insert(Textbox {
-                    text: "".to_owned(),
-                    multiline: true,
-                })
+                .insert(Textbox { text: "".to_owned(), multiline: true })
                 .insert(EguiId::default());
             });
 
@@ -274,10 +255,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     align_self: AlignSelf::Center,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
-                    margin: Rect {
-                        top: Val::Px(6.0),
-                        ..Default::default()
-                    },
+                    margin: Rect { top: Val::Px(6.0), ..Default::default() },
                     ..Default::default()
                 },
                 color: UiColor(NORMAL_BUTTON),
@@ -288,10 +266,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             .with_children(|node| {
                 node.spawn_bundle(TextBundle {
                     text: Text::with_section("Fire", button_style.clone(), center_align),
-                    style: Style {
-                        margin: Rect::all(Val::Px(4.0)),
-                        ..Default::default()
-                    },
+                    style: Style { margin: Rect::all(Val::Px(4.0)), ..Default::default() },
                     ..Default::default()
                 });
             });
@@ -325,10 +300,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
-        let center_align = TextAlignment {
-            horizontal: HorizontalAlign::Center,
-            vertical: VerticalAlign::Center,
-        };
+        let center_align =
+            TextAlignment { horizontal: HorizontalAlign::Center, vertical: VerticalAlign::Center };
 
         let left_side_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
@@ -361,10 +334,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         function_label_style.clone(),
                         center_align,
                     ),
-                    style: Style {
-                        align_self: AlignSelf::Center,
-                        ..Default::default()
-                    },
+                    style: Style { align_self: AlignSelf::Center, ..Default::default() },
                     ..Default::default()
                 });
 
@@ -410,10 +380,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         .insert(FunctionDisplayBox)
                         .maybe_insert((axis == "x").then(|| FunctionX))
                         .maybe_insert((axis == "y").then(|| FunctionY))
-                        .insert(Textbox {
-                            text: "".to_owned(),
-                            multiline: false,
-                        })
+                        .insert(Textbox { text: "".to_owned(), multiline: false })
                         .insert(EguiId::default());
                     });
                 }
@@ -453,10 +420,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     .insert(Owner(player_index))
                     .insert(FunctionDisplayBox)
                     .insert(FunctionWhere)
-                    .insert(Textbox {
-                        text: "".to_owned(),
-                        multiline: true,
-                    })
+                    .insert(Textbox { text: "".to_owned(), multiline: true })
                     .insert(EguiId::default());
                 });
 
@@ -476,10 +440,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                     align_self: AlignSelf::Center,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
-                    margin: Rect {
-                        top: Val::Px(6.0),
-                        ..Default::default()
-                    },
+                    margin: Rect { top: Val::Px(6.0), ..Default::default() },
                     ..Default::default()
                 },
                 color: UiColor(NORMAL_BUTTON),
@@ -489,10 +450,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             .with_children(|node| {
                 node.spawn_bundle(TextBundle {
                     text: Text::with_section("Next Round", button_style.clone(), center_align),
-                    style: Style {
-                        margin: Rect::all(Val::Px(4.0)),
-                        ..Default::default()
-                    },
+                    style: Style { margin: Rect::all(Val::Px(4.0)), ..Default::default() },
                     ..Default::default()
                 })
                 .insert(NextRoundText);
@@ -504,15 +462,10 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
 }
 
 pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands
-        .spawn_bundle(UiCameraBundle::default())
-        .insert(UiCamera);
+    commands.spawn_bundle(UiCameraBundle::default()).insert(UiCamera);
 
     // Menu
-    commands
-        .spawn()
-        .spawn_menu_ui(&asset_server)
-        .insert(MenuScreen);
+    commands.spawn().spawn_menu_ui(&asset_server).insert(MenuScreen);
 
     commands
         .spawn_bundle(NodeBundle {
@@ -646,14 +599,12 @@ pub fn update_done_button(
     buttons_enabled: Res<ButtonsEnabled>,
 ) {
     if !buttons_enabled.0 {
-        return
+        return;
     }
 
     if let Ok((interaction, owner)) = buttons.get_single() {
         if *interaction == Interaction::Clicked {
-            fire_events.send(SendFunctions {
-                player_index: owner.0,
-            });
+            fire_events.send(SendFunctions { player_index: owner.0 });
         }
     }
 }
@@ -664,7 +615,7 @@ pub fn update_next_round_button(
     buttons_enabled: Res<ButtonsEnabled>,
 ) {
     if !buttons_enabled.0 {
-        return
+        return;
     }
 
     if let Ok(interaction) = buttons.get_single() {
@@ -689,7 +640,7 @@ pub fn advance_turn(
     mut next_round_text: Query<&mut Text, (With<NextRoundText>, Without<FunctionStatus>)>,
 ) {
     if advance_turn_events.iter().next().is_none() {
-        return
+        return;
     }
 
     game.order_index += 1;
@@ -698,8 +649,8 @@ pub fn advance_turn(
         game.rotate_players();
     } else {
         textboxes_editable.0 = true;
+        buttons_enabled.0 = true;
     }
-    buttons_enabled.0 = true;
 
     for mut owner in owned_ui.iter_mut() {
         owner.0 = game.player_turn();
@@ -723,11 +674,7 @@ pub fn advance_turn(
         } else if game.is_on_last_normal_round() {
             "To Final Round (Destruction)".to_owned()
         } else {
-            format!(
-                "To Next Round ({} of {})",
-                game.round_index + 1,
-                game.num_rounds
-            )
+            format!("To Next Round ({} of {})", game.round_index + 1, game.num_rounds)
         };
 
         next_round_text.single_mut().sections[0].value = round_text;
@@ -743,20 +690,14 @@ pub fn advance_round(
     mut textboxes_editable: ResMut<TextboxesEditable>,
 ) {
     if advance_round_events.iter().next().is_none() {
-        return
+        return;
     }
     game.round_index += 1;
     play_state.set(PlayState::Enter).unwrap();
 
     // Workaround while this is a startup system
-    function_ui
-        .get_single_mut()
-        .map(|mut ui| ui.display = Display::Flex)
-        .ok();
-    function_display
-        .get_single_mut()
-        .map(|mut ui| ui.display = Display::None)
-        .ok();
+    function_ui.get_single_mut().map(|mut ui| ui.display = Display::Flex).ok();
+    function_display.get_single_mut().map(|mut ui| ui.display = Display::None).ok();
     textboxes_editable.0 = true;
 }
 
@@ -834,16 +775,16 @@ pub fn update_textboxes(
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
         if size.size.x == 0.0 && size.size.y == 0.0 {
-            continue
+            continue;
         }
 
         let id = if let Some(id) = id.0 { id } else { continue };
         let left = transform.translation.x - size.size.x / 2.0;
         let bottom = transform.translation.y - size.size.y / 2.0;
 
-        egui::Area::new(id.to_string())
-            .anchor(Align2::LEFT_BOTTOM, [left, -bottom])
-            .show(egui_ctx.ctx_mut(), |ui| {
+        egui::Area::new(id.to_string()).anchor(Align2::LEFT_BOTTOM, [left, -bottom]).show(
+            egui_ctx.ctx_mut(),
+            |ui| {
                 ui.set_width(size.size.x);
                 ui.set_height(size.size.y);
 
@@ -874,7 +815,8 @@ pub fn update_textboxes(
                 } else {
                     add_textbox(ui, &mut textbox.text.as_str(), egui::TextEdit::singleline);
                 }
-            });
+            },
+        );
     }
 }
 

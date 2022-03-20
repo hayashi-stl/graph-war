@@ -205,7 +205,7 @@ pub fn run() {
         .add_system_set(SystemSet::on_update(PlayState::Menu).with_system(ui::update_play_button))
         .add_system_set(
             SystemSet::on_enter(PlayState::Load)
-                .with_system(load_field.label(Label::LoadField).after(Label::Setup))
+                .with_system(load_field.label(Label::LoadField))
                 .with_system(ui::advance_round.after(Label::LoadField)),
         )
         .add_system_set(
@@ -239,11 +239,7 @@ pub fn run() {
                 .with_system(graph::graph_functions.after(Label::CollectItems))
                 .with_system(update_scores.after(Label::CollectItems)),
         )
-        .add_system(
-            ui::advance_turn
-                .label(Label::AdvanceTurn)
-                .after(Label::CollectItems),
-        )
+        .add_system(ui::advance_turn.label(Label::AdvanceTurn).after(Label::CollectItems))
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
         .run();
@@ -282,145 +278,121 @@ pub fn load_field(
     let cell_size = 1.0;
     let scale = game.scale;
 
-    commands
-        .spawn_bundle(FieldBundle::default())
-        .with_children(|node| {
-            let mut camera = OrthographicCameraBundle::new_2d();
-            camera.orthographic_projection.scaling_mode = ScalingMode::None;
-            camera.orthographic_projection.scale = scale;
-            node.spawn_bundle(camera);
+    commands.spawn_bundle(FieldBundle::default()).with_children(|node| {
+        let mut camera = OrthographicCameraBundle::new_2d();
+        camera.orthographic_projection.scaling_mode = ScalingMode::None;
+        camera.orthographic_projection.scale = scale;
+        node.spawn_bundle(camera);
 
-            let axis = Sprite {
-                color: Color::rgb(0.0, 0.0, 0.0),
-                custom_size: Some(Vec2::new(2.0 * scale, AXIS_THICKNESS)),
-                ..Default::default()
-            };
-            let rot_90 =
-                Transform::from_matrix(Mat4::from_mat3(Mat3::from_mat2(Mat2::from_cols_array(&[
-                    0.0, 1.0, -1.0, 0.0,
-                ]))));
+        let axis = Sprite {
+            color: Color::rgb(0.0, 0.0, 0.0),
+            custom_size: Some(Vec2::new(2.0 * scale, AXIS_THICKNESS)),
+            ..Default::default()
+        };
+        let rot_90 =
+            Transform::from_matrix(Mat4::from_mat3(Mat3::from_mat2(Mat2::from_cols_array(&[
+                0.0, 1.0, -1.0, 0.0,
+            ]))));
 
-            // Axes
-            node.spawn_bundle(SpriteBundle {
-                sprite: axis.clone(),
-                ..Default::default()
-            });
-            node.spawn_bundle(SpriteBundle {
-                sprite: axis,
-                transform: rot_90,
-                ..Default::default()
-            });
+        // Axes
+        node.spawn_bundle(SpriteBundle { sprite: axis.clone(), ..Default::default() });
+        node.spawn_bundle(SpriteBundle { sprite: axis, transform: rot_90, ..Default::default() });
 
-            // Grid
-            let grid_line = Sprite {
-                color: Color::rgba(0.0, 0.0, 0.0, 0.25),
-                custom_size: Some(Vec2::new(2.0 * scale, GRID_THICKNESS)),
-                ..Default::default()
-            };
+        // Grid
+        let grid_line = Sprite {
+            color: Color::rgba(0.0, 0.0, 0.0, 0.25),
+            custom_size: Some(Vec2::new(2.0 * scale, GRID_THICKNESS)),
+            ..Default::default()
+        };
 
-            let label_style = TextStyle {
-                font: asset_server.load("NotoMono-Regular.ttf"),
-                font_size: 0.0, // will be filled in by RelativeTextSize
-                color: Color::BLACK,
-            };
-            let label_alignment_x = TextAlignment {
-                vertical: VerticalAlign::Top,
-                horizontal: HorizontalAlign::Center,
-            };
-            let label_alignment_y = TextAlignment {
-                vertical: VerticalAlign::Center,
-                horizontal: HorizontalAlign::Right,
-            };
+        let label_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 0.0, // will be filled in by RelativeTextSize
+            color: Color::BLACK,
+        };
+        let label_alignment_x =
+            TextAlignment { vertical: VerticalAlign::Top, horizontal: HorizontalAlign::Center };
+        let label_alignment_y =
+            TextAlignment { vertical: VerticalAlign::Center, horizontal: HorizontalAlign::Right };
 
-            for dist in (1..(scale / cell_size) as i32).map(|i| i as f32 * cell_size) {
-                let transforms = [
-                    Transform::from_xyz(0.0, dist, z::GRID),
-                    Transform::from_xyz(0.0, -dist, z::GRID),
-                    rot_90.mul_transform(Transform::from_xyz(0.0, dist, z::GRID)),
-                    rot_90.mul_transform(Transform::from_xyz(0.0, -dist, z::GRID)),
+        for dist in (1..(scale / cell_size) as i32).map(|i| i as f32 * cell_size) {
+            let transforms = [
+                Transform::from_xyz(0.0, dist, z::GRID),
+                Transform::from_xyz(0.0, -dist, z::GRID),
+                rot_90.mul_transform(Transform::from_xyz(0.0, dist, z::GRID)),
+                rot_90.mul_transform(Transform::from_xyz(0.0, -dist, z::GRID)),
+            ];
+            for transform in transforms {
+                node.spawn_bundle(SpriteBundle {
+                    sprite: grid_line.clone(),
+                    transform,
+                    ..Default::default()
+                });
+            }
+
+            for dir in [1.0, -1.0] {
+                let dist = dist * dir;
+                let pairs = [
+                    (Transform::from_xyz(dist, -0.05, z::GRID_TEXT), label_alignment_x),
+                    (Transform::from_xyz(-0.05, dist, z::GRID_TEXT), label_alignment_y),
                 ];
-                for transform in transforms {
-                    node.spawn_bundle(SpriteBundle {
-                        sprite: grid_line.clone(),
+                for (transform, alignment) in pairs {
+                    node.spawn_bundle(Text2dBundle {
+                        text: Text::with_section(
+                            format!("{}", dist),
+                            label_style.clone(),
+                            alignment,
+                        ),
                         transform,
                         ..Default::default()
-                    });
-                }
-
-                for dir in [1.0, -1.0] {
-                    let dist = dist * dir;
-                    let pairs = [
-                        (
-                            Transform::from_xyz(dist, -0.05, z::GRID_TEXT),
-                            label_alignment_x,
-                        ),
-                        (
-                            Transform::from_xyz(-0.05, dist, z::GRID_TEXT),
-                            label_alignment_y,
-                        ),
-                    ];
-                    for (transform, alignment) in pairs {
-                        node.spawn_bundle(Text2dBundle {
-                            text: Text::with_section(
-                                format!("{}", dist),
-                                label_style.clone(),
-                                alignment,
-                            ),
-                            transform,
-                            ..Default::default()
-                        })
-                        .insert(RelativeTextSize(0.2));
-                    }
+                    })
+                    .insert(RelativeTextSize(0.2));
                 }
             }
+        }
 
-            let score_style = TextStyle {
-                font: asset_server.load("NotoMono-Regular.ttf"),
-                font_size: 0.0, // will be filled in by RelativeTextSize
-                color: Color::BLACK,
-            };
-            let score_alignment = TextAlignment {
-                vertical: VerticalAlign::Center,
-                horizontal: HorizontalAlign::Center,
-            };
+        let score_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 0.0, // will be filled in by RelativeTextSize
+            color: Color::BLACK,
+        };
+        let score_alignment =
+            TextAlignment { vertical: VerticalAlign::Center, horizontal: HorizontalAlign::Center };
 
-            let positions = [
-                [-3.0, 3.0, z::PLAYER],
-                [-3.0, -3.0, z::PLAYER],
-                [3.0, 3.0, z::PLAYER],
-                [3.0, -3.0, z::PLAYER],
-            ];
+        let positions = [
+            [-3.0, 3.0, z::PLAYER],
+            [-3.0, -3.0, z::PLAYER],
+            [3.0, 3.0, z::PLAYER],
+            [3.0, -3.0, z::PLAYER],
+        ];
 
-            for (i, pos) in positions.into_iter().enumerate() {
-                // Player icon
-                node.spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::ONE),
-                        ..Default::default()
-                    },
-                    texture: asset_server.load(&format!("player{}.png", i + 1)),
-                    transform: Transform::from_translation(Vec3::from(pos))
-                        .with_scale(Vec3::from([0.4; 3])),
-                    ..Default::default()
-                })
-                .insert(Owner(i as u32))
-                .insert(PlayerLabel);
+        for (i, pos) in positions.into_iter().enumerate() {
+            // Player icon
+            node.spawn_bundle(SpriteBundle {
+                sprite: Sprite { custom_size: Some(Vec2::ONE), ..Default::default() },
+                texture: asset_server.load(&format!("player{}.png", i + 1)),
+                transform: Transform::from_translation(Vec3::from(pos))
+                    .with_scale(Vec3::from([0.4; 3])),
+                ..Default::default()
+            })
+            .insert(Owner(i as u32))
+            .insert(PlayerLabel);
 
-                // Score
-                node.spawn_bundle(Text2dBundle {
-                    text: Text::with_section("0", score_style.clone(), score_alignment),
-                    transform: Transform::from_translation(
-                        (Vec2::new(pos[0], pos[1]) * 3.4 / 3.0).extend(z::SCORE),
-                    ),
-                    ..Default::default()
-                })
-                .insert(RelativeTextSize(0.4))
-                .insert(Owner(i as u32))
-                .insert(Score);
+            // Score
+            node.spawn_bundle(Text2dBundle {
+                text: Text::with_section("0", score_style.clone(), score_alignment),
+                transform: Transform::from_translation(
+                    (Vec2::new(pos[0], pos[1]) * 3.4 / 3.0).extend(z::SCORE),
+                ),
+                ..Default::default()
+            })
+            .insert(RelativeTextSize(0.4))
+            .insert(Owner(i as u32))
+            .insert(Score);
 
-                players.push(Player::default());
-            }
-        });
+            players.push(Player::default());
+        }
+    });
 
     advance_round_events.send(AdvanceRound);
 }
@@ -490,6 +462,7 @@ fn init_enter_functions(
     game: Res<Game>,
     players: Res<Vec<Player>>,
     items: Query<Entity, Or<(With<Ball>, With<Mine>, With<Graph>)>>,
+    field: Query<Entity, With<Field>>,
 ) {
     for entity in items.iter() {
         commands.entity(entity).despawn_recursive();
@@ -507,20 +480,17 @@ fn init_enter_functions(
         game.scale,
     );
 
-    fn spawn_item<'a, 'w, 's>(
-        commands: &'a mut Commands<'w, 's>,
+    fn spawn_item<'a, 'w, 's, 'b>(
+        node: &'b mut ChildBuilder<'w, 's, 'a>,
         asset_server: &Res<AssetServer>,
         point: Vec3,
         item_params: &ItemParams,
         param: u32,
-    ) -> EntityCommands<'w, 's, 'a> {
+    ) -> EntityCommands<'w, 's, 'b> {
         let scale = 0.3;
 
-        let mut entity_commands = commands.spawn_bundle(SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::ONE),
-                ..Default::default()
-            },
+        let mut entity_commands = node.spawn_bundle(SpriteBundle {
+            sprite: Sprite { custom_size: Some(Vec2::ONE), ..Default::default() },
             texture: asset_server.load(&item_params.texture.call(param)),
             transform: Transform::from_translation(point)
                 .with_scale(Vec3::from([scale * item_params.scale_multiplier; 3])),
@@ -551,45 +521,33 @@ fn init_enter_functions(
         entity_commands
     }
 
-    if game.is_on_destruction_round() {
-        for (i, player) in players.iter().enumerate() {
+    commands.entity(field.single()).with_children(|node| {
+        if game.is_on_destruction_round() {
+            for (i, player) in players.iter().enumerate() {
+                let points = (&item_distribution).sample_iter(&mut *rng);
+                for point in points.take(player.num_balls as usize) {
+                    spawn_item(
+                        node,
+                        &asset_server,
+                        point.extend(z::BALL),
+                        &ITEM_PLAYER_BALL,
+                        i as u32 + 1,
+                    )
+                    .insert(Owner(i as u32))
+                    .insert(Ball);
+                }
+            }
+        } else {
             let points = (&item_distribution).sample_iter(&mut *rng);
-            for point in points.take(player.num_balls as usize) {
-                spawn_item(
-                    &mut commands,
-                    &asset_server,
-                    point.extend(z::BALL),
-                    &ITEM_PLAYER_BALL,
-                    i as u32 + 1,
-                )
-                .insert(Owner(i as u32))
-                .insert(Ball);
+            for point in points.take(85) {
+                spawn_item(node, &asset_server, point.extend(z::BALL), &ITEM_BALL, 0).insert(Ball);
+            }
+            let points = (&item_distribution).sample_iter(&mut *rng);
+            for point in points.take(15) {
+                spawn_item(node, &asset_server, point.extend(z::MINE), &ITEM_MINE, 0).insert(Mine);
             }
         }
-    } else {
-        let points = (&item_distribution).sample_iter(&mut *rng);
-        for point in points.take(85) {
-            spawn_item(
-                &mut commands,
-                &asset_server,
-                point.extend(z::BALL),
-                &ITEM_BALL,
-                0,
-            )
-            .insert(Ball);
-        }
-        let points = (&item_distribution).sample_iter(&mut *rng);
-        for point in points.take(15) {
-            spawn_item(
-                &mut commands,
-                &asset_server,
-                point.extend(z::MINE),
-                &ITEM_MINE,
-                0,
-            )
-            .insert(Mine);
-        }
-    }
+    });
 }
 
 fn update_scores(mut scores: Query<(&mut Text, &Owner), With<Score>>, players: Res<Vec<Player>>) {
@@ -629,11 +587,7 @@ fn resize(
         style.flex_basis = Val::Px(height);
     }
 
-    let mut camera = if let Ok(camera) = camera.get_single_mut() {
-        camera
-    } else {
-        return
-    };
+    let mut camera = if let Ok(camera) = camera.get_single_mut() { camera } else { return };
 
     let scale = camera.scale;
     camera.left = 1.0 - 2.0 * aspect_ratio;

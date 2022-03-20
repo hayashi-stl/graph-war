@@ -16,7 +16,7 @@ use crate::{
         ButtonsEnabled, FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere,
         FunctionX, FunctionY, Textbox, TextboxesEditable,
     },
-    z, Owner, Player, PlayerLabel,
+    z, Field, Owner, Player, PlayerLabel,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -130,13 +130,9 @@ impl Call2 {
 }
 
 static CONSTS: Lazy<FxHashMap<&str, f64>> = Lazy::new(|| {
-    [
-        ("tau", std::f64::consts::TAU),
-        ("pi", std::f64::consts::PI),
-        ("e", std::f64::consts::E),
-    ]
-    .into_iter()
-    .collect()
+    [("tau", std::f64::consts::TAU), ("pi", std::f64::consts::PI), ("e", std::f64::consts::E)]
+        .into_iter()
+        .collect()
 });
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -257,10 +253,7 @@ impl Function {
                 let func = pairs.next().unwrap();
                 let expr = pairs.next().unwrap();
                 if let Some(call) = CALL_1_FN_MAP.get(func.as_str()) {
-                    Ok(Self::Call1(
-                        *call,
-                        Box::new(Self::from_pair(expr, var_map)?),
-                    ))
+                    Ok(Self::Call1(*call, Box::new(Self::from_pair(expr, var_map)?)))
                 } else {
                     Err(Error::new_from_span(
                         ErrorVariant::CustomError {
@@ -329,10 +322,7 @@ impl Function {
                 OpType::Third => acc.div_euclid(f.eval(t, assigns)),
                 OpType::Fourth => acc.rem_euclid(f.eval(t, assigns)),
             }),
-            Self::Exp(fs) => fs
-                .iter()
-                .rev()
-                .fold(1.0, |acc, f| f.eval(t, assigns).powf(acc)),
+            Self::Exp(fs) => fs.iter().rev().fold(1.0, |acc, f| f.eval(t, assigns).powf(acc)),
             Self::Neg(f) => -f.eval(t, assigns),
             Self::Call1(call, f) => call.call(f.eval(t, assigns)),
             Self::Call2(call, fs) => call.call(fs[0].eval(t, assigns), fs[1].eval(t, assigns)),
@@ -352,9 +342,7 @@ trait Assigns: Sized {
 
 impl Assigns for AssignVec {
     fn from_pairs(pairs: Pairs<Rule>) -> Result<(Self, VarIndexMap), Error<Rule>> {
-        let mut var_map = [("t".to_owned(), None)]
-            .into_iter()
-            .collect::<FxHashMap<_, _>>();
+        let mut var_map = [("t".to_owned(), None)].into_iter().collect::<FxHashMap<_, _>>();
 
         let assign_vec = pairs
             .filter(|pair| pair.as_rule() != Rule::EOI)
@@ -420,10 +408,7 @@ impl Parametric {
     }
 
     fn eval(&self, t: f64) -> Vec2 {
-        Vec2::new(
-            self.x.eval(t, &self.assigns) as f32,
-            self.y.eval(t, &self.assigns) as f32,
-        )
+        Vec2::new(self.x.eval(t, &self.assigns) as f32, self.y.eval(t, &self.assigns) as f32)
     }
 }
 
@@ -441,11 +426,7 @@ struct ParseError {
 
 impl ParseError {
     fn new(error: Error<Rule>, label: String, include_line: bool) -> Self {
-        Self {
-            error,
-            label,
-            include_line,
-        }
+        Self { error, label, include_line }
     }
 }
 
@@ -458,15 +439,10 @@ fn set_status_text(text: &mut Text, error: Option<ParseError>) {
         let (line, column) = match error.error.line_col {
             LineColLocation::Pos((l, c)) | LineColLocation::Span((l, c), _) => (l, c),
         };
-        let line_message = if error.include_line {
-            format!("line {} ", line)
-        } else {
-            String::new()
-        };
-        let message = format!(
-            "Error in {} ({}col {}): {}\n",
-            error.label, line_message, column, message_end
-        );
+        let line_message =
+            if error.include_line { format!("line {} ", line) } else { String::new() };
+        let message =
+            format!("Error in {} ({}col {}): {}\n", error.label, line_message, column, message_end);
         text.sections[0].value = message;
         text.sections[0].style.color = Color::MAROON;
     } else {
@@ -485,6 +461,7 @@ pub fn send_functions(
     mut commands: Commands,
     mut textboxes_editable: ResMut<TextboxesEditable>,
     mut buttons_enabled: ResMut<ButtonsEnabled>,
+    field: Query<Entity, With<Field>>,
 ) {
     'main: for event in fire_events.iter() {
         let mut status_text = status.single_mut();
@@ -559,20 +536,16 @@ pub fn send_functions(
         let fy = funcs.pop().unwrap();
         let fx = funcs.pop().unwrap();
 
-        let parametric = Parametric::new(
-            fx,
-            fy,
-            assigns,
-            fx_str.clone(),
-            fy_str.clone(),
-            where_str.clone(),
-        );
+        let parametric =
+            Parametric::new(fx, fy, assigns, fx_str.clone(), fy_str.clone(), where_str.clone());
 
         set_status_text(&mut *status_text, None);
 
         players[player as usize].parametric = Some(parametric);
 
-        commands.spawn_bundle(DelayedEventBundle::new(1.0, DelayedEvent::AdvanceTurn));
+        commands.entity(field.single()).with_children(|node| {
+            node.spawn_bundle(DelayedEventBundle::new(1.0, DelayedEvent::AdvanceTurn));
+        });
         textboxes_editable.0 = false;
         buttons_enabled.0 = false;
     }
@@ -592,24 +565,16 @@ pub fn fire_rockets(
     mut textboxes_fx: Query<(&Owner, &mut Textbox), (With<FunctionDisplayBox>, With<FunctionX>)>,
     mut textboxes_fy: Query<
         (&Owner, &mut Textbox),
-        (
-            With<FunctionDisplayBox>,
-            With<FunctionY>,
-            Without<FunctionX>,
-        ),
+        (With<FunctionDisplayBox>, With<FunctionY>, Without<FunctionX>),
     >,
     mut textboxes_where: Query<
         (&Owner, &mut Textbox),
-        (
-            With<FunctionDisplayBox>,
-            With<FunctionWhere>,
-            Without<FunctionX>,
-            Without<FunctionY>,
-        ),
+        (With<FunctionDisplayBox>, With<FunctionWhere>, Without<FunctionX>, Without<FunctionY>),
     >,
     mut players: ResMut<Vec<Player>>,
     player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
     asset_server: Res<AssetServer>,
+    field: Query<Entity, With<Field>>,
 ) {
     for (owner, mut textbox) in textboxes_fx.iter_mut() {
         let parametric = players[owner.0 as usize].parametric.as_mut().unwrap();
@@ -624,64 +589,59 @@ pub fn fire_rockets(
         textbox.text = parametric.source_assigns.take().unwrap();
     }
 
-    for (owner, transform) in player_comps.iter() {
-        let player = owner.0;
-        let parametric = players[player as usize].parametric.take().unwrap();
-        let start = parametric.eval(0.0);
+    commands.entity(field.single()).with_children(|node| {
+        for (owner, transform) in player_comps.iter() {
+            let player = owner.0;
+            let parametric = players[player as usize].parametric.take().unwrap();
+            let start = parametric.eval(0.0);
 
-        let scale = 0.3;
-        let rocket = commands
-            .spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(2.8, 1.4)),
+            let scale = 0.3;
+            let rocket = node
+                .spawn_bundle(SpriteBundle {
+                    sprite: Sprite { custom_size: Some(Vec2::new(2.8, 1.4)), ..Default::default() },
+                    texture: asset_server.load(&format!("rocket{}.png", player + 1)),
+                    transform: Transform::from(*transform).with_scale([scale; 3].into()),
                     ..Default::default()
-                },
-                texture: asset_server.load(&format!("rocket{}.png", player + 1)),
-                transform: Transform::from(*transform).with_scale([scale; 3].into()),
-                ..Default::default()
-            })
-            .insert(parametric)
-            .insert(Offset(transform.translation.xy() - start))
-            .insert(Rocket)
-            .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
-            .insert(Owner(player))
-            .insert(PrevPosition(transform.translation.xy()))
-            .insert_bundle(RigidBodyBundle {
-                body_type: RigidBodyType::KinematicPositionBased.into(),
-                position: transform.translation.xy().extend(0.0).into(),
-                // kinematic-static CCD doesn't work
-                ..Default::default()
-            })
-            .with_children(|body| {
-                body.spawn_bundle(ColliderBundle {
-                    shape: ColliderShape::ball(scale / 2.0).into(),
-                    collider_type: ColliderType::Solid.into(),
-                    position: Vec2::ZERO.into(),
-                    flags: ColliderFlags {
-                        collision_groups: InteractionGroups::new(
-                            CollisionGroups::ROCKET.bits(),
-                            CollisionGroups::ROCKET_CAST.bits(),
-                        ),
-                        active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
-                            | ActiveCollisionTypes::KINEMATIC_STATIC,
+                })
+                .insert(parametric)
+                .insert(Offset(transform.translation.xy() - start))
+                .insert(Rocket)
+                .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
+                .insert(Owner(player))
+                .insert(PrevPosition(transform.translation.xy()))
+                .insert_bundle(RigidBodyBundle {
+                    body_type: RigidBodyType::KinematicPositionBased.into(),
+                    position: transform.translation.xy().extend(0.0).into(),
+                    // kinematic-static CCD doesn't work
+                    ..Default::default()
+                })
+                .with_children(|body| {
+                    body.spawn_bundle(ColliderBundle {
+                        shape: ColliderShape::ball(scale / 2.0).into(),
+                        collider_type: ColliderType::Solid.into(),
+                        position: Vec2::ZERO.into(),
+                        flags: ColliderFlags {
+                            collision_groups: InteractionGroups::new(
+                                CollisionGroups::ROCKET.bits(),
+                                CollisionGroups::ROCKET_CAST.bits(),
+                            ),
+                            active_collision_types: ActiveCollisionTypes::KINEMATIC_KINEMATIC
+                                | ActiveCollisionTypes::KINEMATIC_STATIC,
+                            ..Default::default()
+                        }
+                        .into(),
                         ..Default::default()
-                    }
-                    .into(),
-                    ..Default::default()
-                });
-            })
-            .id();
+                    });
+                })
+                .id();
 
-        commands
-            .spawn()
-            .insert(Transform::identity())
-            .insert(GlobalTransform::identity())
-            .insert(*owner)
-            .insert(Graph {
-                color: GRAPH_COLORS[owner.0 as usize],
-                rocket,
-            });
-    }
+            node.spawn()
+                .insert(Transform::identity())
+                .insert(GlobalTransform::identity())
+                .insert(*owner)
+                .insert(Graph { color: GRAPH_COLORS[owner.0 as usize], rocket });
+        }
+    });
 }
 
 pub fn move_rockets(
@@ -707,7 +667,7 @@ pub fn move_rockets(
     {
         // The colliders are missing for 1 frame, so skip that frame
         if colliders.0 .0.is_empty() {
-            return
+            return;
         }
 
         rockets_exist = true;
@@ -740,15 +700,12 @@ pub fn graph_functions(
     const GRAPH_THICKNESS: f32 = 0.03;
 
     for (entity, graph) in graphs.iter() {
-        let (prev_pos, curr_transform) = if let Ok(r) = rockets.get(graph.rocket) {
-            r
-        } else {
-            continue
-        };
+        let (prev_pos, curr_transform) =
+            if let Ok(r) = rockets.get(graph.rocket) { r } else { continue };
         let prev_pos = prev_pos.0;
         let curr_pos = curr_transform.translation.xy();
         if prev_pos == curr_pos {
-            continue
+            continue;
         }
 
         let line_pos = ((prev_pos + curr_pos) / 2.0).extend(z::GRAPH);
