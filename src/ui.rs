@@ -23,6 +23,12 @@ fn enter_function_text(player_index: u32) -> String {
 }
 
 trait EntityCommandsExt {
+    /// Menu UI
+    fn spawn_menu_ui(
+        &mut self,
+        asset_server: &Res<AssetServer>,
+    ) -> &mut Self;
+
     /// UI for inputting a function
     fn spawn_function_ui(
         &mut self,
@@ -47,6 +53,79 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         } else {
             self
         }
+    }
+
+    fn spawn_menu_ui(
+        &mut self,
+        asset_server: &Res<AssetServer>,
+    ) -> &mut Self {
+        let button_style = TextStyle {
+            font: asset_server.load("NotoMono-Regular.ttf"),
+            font_size: 28.0,
+            color: Color::BLACK,
+        };
+
+        let center_align = TextAlignment {
+            horizontal: HorizontalAlign::Center,
+            vertical: VerticalAlign::Center,
+        };
+
+        self.insert_bundle(NodeBundle {
+            style: Style {
+                flex_direction: FlexDirection::ColumnReverse,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    bottom: Val::Percent(0.0),
+                    left: Val::Percent(0.0),
+                    ..Default::default()
+                },
+                size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                min_size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                max_size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                align_items: AlignItems::Center,
+                ..Default::default()
+            },
+            color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
+            ..Default::default()
+        }).with_children(|node| {
+            node.spawn_bundle(ImageBundle {
+                style: Style {
+                    margin: Rect::all(Val::Px(10.0)),
+                    ..Default::default()
+                },
+                image: UiImage(asset_server.load("title.png")),
+                ..Default::default()
+            });
+
+            for num_players in 2..=4 {
+                node.spawn_bundle(ButtonBundle {
+                    style: Style {
+                        align_self: AlignSelf::Center,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
+                        margin: Rect::all(Val::Px(7.0)),
+                        ..Default::default()
+                    },
+                    color: UiColor(NORMAL_BUTTON),
+                    ..Default::default()
+                })
+                .insert(PlayButton { num_players })
+                .with_children(|node| {
+                    node.spawn_bundle(TextBundle {
+                        text: Text::with_section(
+                            format!("{}-Player Game", num_players),
+                            button_style.clone(),
+                            center_align
+                        ),
+                        style: Style {
+                            margin: Rect::all(Val::Px(4.0)),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    });
+                });
+            }
+        })
     }
 
     fn spawn_function_ui(
@@ -433,9 +512,16 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn_bundle(UiCameraBundle::default())
         .insert(UiCamera);
 
+    // Menu
+    commands
+        .spawn()
+        .spawn_menu_ui(&asset_server)
+        .insert(MenuScreen);
+
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
+                display: Display::None,
                 flex_direction: FlexDirection::RowReverse,
                 position_type: PositionType::Absolute,
                 position: Rect {
@@ -500,7 +586,13 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             })
             .insert(FunctionUi)
             .spawn_function_ui(&asset_server, 0);
-        });
+        })
+        .insert(GameScreen);
+}
+
+#[derive(Component)]
+pub struct PlayButton {
+    num_players: u32
 }
 
 #[derive(Component)]
@@ -530,6 +622,24 @@ pub fn update_buttons(
             }
         } else {
             UiColor(DISABLED_BUTTON)
+        }
+    }
+}
+
+pub fn update_play_button(
+    buttons: Query<(&Interaction, &PlayButton), Changed<Interaction>>,
+    mut play_state: ResMut<State<PlayState>>,
+    mut game: ResMut<Game>,
+    mut menu_screen: Query<&mut Style, With<MenuScreen>>,
+    mut game_screen: Query<&mut Style, (With<GameScreen>, Without<MenuScreen>)>,
+) {
+    // Play buttons are always enabled when they exist.
+    if let Some((interaction, PlayButton { num_players })) = buttons.iter().next() {
+        if *interaction == Interaction::Clicked {
+            game.set_num_players(*num_players);
+            play_state.set(PlayState::Load).ok();
+            menu_screen.single_mut().display = Display::None;
+            game_screen.single_mut().display = Display::Flex;
         }
     }
 }
@@ -658,6 +768,12 @@ pub struct UiCamera;
 #[derive(Component)]
 pub struct GraphNode;
 
+#[derive(Component)]
+pub struct MenuScreen;
+
+#[derive(Component)]
+pub struct GameScreen;
+
 /// Labels the function entry UI
 #[derive(Component)]
 pub struct FunctionUi;
@@ -687,7 +803,6 @@ pub struct TextboxesEditable(pub bool);
 /// Whether buttons are enabled
 pub struct ButtonsEnabled(pub bool);
 
-/// Labels function entry textboxes
 /// Labels function entry textboxes
 #[derive(Component)]
 pub struct FunctionEntryBox;

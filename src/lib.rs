@@ -70,7 +70,8 @@ pub struct Mine;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlayState {
-    Wait,
+    Menu,
+    Load,
     /// Enter functions
     Enter,
     /// Fire rockets
@@ -168,7 +169,7 @@ pub fn run() {
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
         .insert_resource(ui::ButtonsEnabled(true))
-        .add_state(PlayState::Wait)
+        .add_state(PlayState::Menu)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
@@ -185,13 +186,20 @@ pub fn run() {
         .add_startup_system(seed_rng.label(Label::SeedRng))
         .add_startup_system(ui::setup_egui.label(Label::Setup).after(Label::SeedRng))
         .add_startup_system(ui::load_ui.label(Label::Setup).after(Label::SeedRng))
-        .add_startup_system(load_field.label(Label::LoadField).after(Label::Setup))
-        .add_startup_system(ui::advance_round.after(Label::LoadField))
         .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
         .add_system_to_stage(CoreStage::PreUpdate, ui::update_buttons)
         .add_system_to_stage(CoreStage::PreUpdate, collision::update_prev_positions)
         .add_system(resize)
         .add_system(ui::update_textboxes)
+        .add_system_set(
+            SystemSet::on_update(PlayState::Menu)
+                .with_system(ui::update_play_button)
+        )
+        .add_system_set(
+            SystemSet::on_enter(PlayState::Load)
+                .with_system(load_field.label(Label::LoadField).after(Label::Setup))
+                .with_system(ui::advance_round.after(Label::LoadField))
+        )
         .add_system_set(
             SystemSet::on_enter(PlayState::Enter)
                 .with_system(move_players.label(Label::MovePlayers))
@@ -374,7 +382,6 @@ pub fn load_field(
         [3.0, 3.0, z::PLAYER],
         [3.0, -3.0, z::PLAYER],
     ];
-    game.set_num_players(positions.len() as u32);
 
     for (i, pos) in positions.into_iter().enumerate() {
         // Player icon
