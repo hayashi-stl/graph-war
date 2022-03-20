@@ -24,10 +24,7 @@ fn enter_function_text(player_index: u32) -> String {
 
 trait EntityCommandsExt {
     /// Menu UI
-    fn spawn_menu_ui(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-    ) -> &mut Self;
+    fn spawn_menu_ui(&mut self, asset_server: &Res<AssetServer>) -> &mut Self;
 
     /// UI for inputting a function
     fn spawn_function_ui(
@@ -55,10 +52,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         }
     }
 
-    fn spawn_menu_ui(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-    ) -> &mut Self {
+    fn spawn_menu_ui(&mut self, asset_server: &Res<AssetServer>) -> &mut Self {
         let button_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
             font_size: 28.0,
@@ -87,7 +81,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             },
             color: UiColor(Color::rgba(0.0, 0.0, 0.0, 0.0)),
             ..Default::default()
-        }).with_children(|node| {
+        })
+        .with_children(|node| {
             node.spawn_bundle(ImageBundle {
                 style: Style {
                     margin: Rect::all(Val::Px(10.0)),
@@ -115,7 +110,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         text: Text::with_section(
                             format!("{}-Player Game", num_players),
                             button_style.clone(),
-                            center_align
+                            center_align,
                         ),
                         style: Style {
                             margin: Rect::all(Val::Px(4.0)),
@@ -499,7 +494,8 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
                         ..Default::default()
                     },
                     ..Default::default()
-                }).insert(NextRoundText);
+                })
+                .insert(NextRoundText);
             });
         });
 
@@ -592,7 +588,7 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 #[derive(Component)]
 pub struct PlayButton {
-    num_players: u32
+    num_players: u32,
 }
 
 #[derive(Component)]
@@ -650,7 +646,7 @@ pub fn update_done_button(
     buttons_enabled: Res<ButtonsEnabled>,
 ) {
     if !buttons_enabled.0 {
-        return;
+        return
     }
 
     if let Ok((interaction, owner)) = buttons.get_single() {
@@ -668,7 +664,7 @@ pub fn update_next_round_button(
     buttons_enabled: Res<ButtonsEnabled>,
 ) {
     if !buttons_enabled.0 {
-        return;
+        return
     }
 
     if let Ok(interaction) = buttons.get_single() {
@@ -693,7 +689,7 @@ pub fn advance_turn(
     mut next_round_text: Query<&mut Text, (With<NextRoundText>, Without<FunctionStatus>)>,
 ) {
     if advance_turn_events.iter().next().is_none() {
-        return;
+        return
     }
 
     game.order_index += 1;
@@ -727,7 +723,11 @@ pub fn advance_turn(
         } else if game.is_on_last_normal_round() {
             "To Final Round (Destruction)".to_owned()
         } else {
-            format!("To Next Round ({} of {})", game.round_index + 1, game.num_rounds)
+            format!(
+                "To Next Round ({} of {})",
+                game.round_index + 1,
+                game.num_rounds
+            )
         };
 
         next_round_text.single_mut().sections[0].value = round_text;
@@ -743,7 +743,7 @@ pub fn advance_round(
     mut textboxes_editable: ResMut<TextboxesEditable>,
 ) {
     if advance_round_events.iter().next().is_none() {
-        return;
+        return
     }
     game.round_index += 1;
     play_state.set(PlayState::Enter).unwrap();
@@ -834,7 +834,7 @@ pub fn update_textboxes(
 ) {
     for (mut textbox, id, size, transform) in textboxes.iter_mut() {
         if size.size.x == 0.0 && size.size.y == 0.0 {
-            continue;
+            continue
         }
 
         let id = if let Some(id) = id.0 { id } else { continue };

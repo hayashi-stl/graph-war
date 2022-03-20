@@ -585,12 +585,7 @@ pub struct Graph {
     rocket: Entity,
 }
 
-const GRAPH_COLORS: [Color; 4] = [
-    Color::RED,
-    Color::CYAN,
-    Color::YELLOW,
-    Color::GREEN,
-];
+const GRAPH_COLORS: [Color; 4] = [Color::RED, Color::CYAN, Color::YELLOW, Color::GREEN];
 
 pub fn fire_rockets(
     mut commands: Commands,
@@ -674,9 +669,11 @@ pub fn fire_rockets(
                     .into(),
                     ..Default::default()
                 });
-            }).id();
+            })
+            .id();
 
-        commands.spawn()
+        commands
+            .spawn()
             .insert(Transform::identity())
             .insert(GlobalTransform::identity())
             .insert(*owner)
@@ -710,7 +707,7 @@ pub fn move_rockets(
     {
         // The colliders are missing for 1 frame, so skip that frame
         if colliders.0 .0.is_empty() {
-            return;
+            return
         }
 
         rockets_exist = true;
@@ -743,25 +740,30 @@ pub fn graph_functions(
     const GRAPH_THICKNESS: f32 = 0.03;
 
     for (entity, graph) in graphs.iter() {
-        let (prev_pos, curr_transform) = if let Ok(r) = rockets.get(graph.rocket) { r } else { continue; };
+        let (prev_pos, curr_transform) = if let Ok(r) = rockets.get(graph.rocket) {
+            r
+        } else {
+            continue
+        };
         let prev_pos = prev_pos.0;
         let curr_pos = curr_transform.translation.xy();
-        if prev_pos == curr_pos { continue; }
+        if prev_pos == curr_pos {
+            continue
+        }
 
         let line_pos = ((prev_pos + curr_pos) / 2.0).extend(z::GRAPH);
         let line_rot = Quat::from_rotation_arc_2d(Vec2::X, (curr_pos - prev_pos).normalize());
         let line_size = Vec2::new((curr_pos - prev_pos).length(), GRAPH_THICKNESS);
-        commands.entity(entity)
-            .with_children(|node| {
-                node.spawn_bundle(SpriteBundle {
-                    sprite: Sprite {
-                        color: graph.color,
-                        custom_size: Some(line_size),
-                        ..Default::default()
-                    },
-                    transform: Transform::from_rotation(line_rot).with_translation(line_pos),
+        commands.entity(entity).with_children(|node| {
+            node.spawn_bundle(SpriteBundle {
+                sprite: Sprite {
+                    color: graph.color,
+                    custom_size: Some(line_size),
                     ..Default::default()
-                });
+                },
+                transform: Transform::from_rotation(line_rot).with_translation(line_pos),
+                ..Default::default()
             });
+        });
     }
 }

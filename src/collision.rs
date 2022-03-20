@@ -60,12 +60,12 @@ pub fn collect_balls(
 
         // Positions equal => rockets just spawned (not near any balls) or rockets didn't move
         if prev_pos == curr_pos {
-            continue;
+            continue
         }
 
         // The colliders are missing for 1 frame, so skip that frame
         if colliders.0 .0.is_empty() {
-            return;
+            return
         }
 
         // Perform shape-casts one at a time to get all the balls swept
