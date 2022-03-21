@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate pest_derive;
 
+pub mod asset;
 pub mod collision;
 pub mod graph;
 pub mod random;
@@ -186,11 +187,12 @@ pub fn run() {
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(ui::IdLender::default())
         .insert_resource(Pcg64::new(0, 0))
-        .insert_resource(vec![Player::default(); 0])
+        .insert_resource(vec![] as Vec<Player>)
         .insert_resource(Game::default())
         .insert_resource(ui::TextboxesEditable(true))
         .insert_resource(ui::ButtonsEnabled(true))
         .insert_resource(PrevWindowSize([0.0, 0.0]))
+        .insert_resource(vec![] as Vec<HandleUntyped>)
         .add_state(PlayState::Menu)
         .add_plugins(DefaultPlugins)
         //.add_plugin(WorldInspectorPlugin::new())
@@ -206,6 +208,7 @@ pub fn run() {
             SystemStage::single_threaded(),
         )
         .add_startup_system(seed_rng.label(Label::SeedRng))
+        .add_startup_system(asset::load_assets.label(Label::SeedRng))
         .add_startup_system(ui::setup_egui.label(Label::Setup).after(Label::SeedRng))
         .add_startup_system(ui::load_ui.label(Label::Setup).after(Label::SeedRng))
         .add_system_to_stage(Stage::AdvanceTimers, time::advance_timers)
@@ -236,10 +239,7 @@ pub fn run() {
                 .after(Label::AdvanceTurn)
                 .with_system(graph::fire_rockets),
         )
-        .add_system_set(
-            SystemSet::on_update(PlayState::Fire)
-                .with_system(show_winner)
-        )
+        .add_system_set(SystemSet::on_update(PlayState::Fire).with_system(show_winner))
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
                 .before(PhysicsSystems::StepWorld)
@@ -347,9 +347,10 @@ fn seed_rng(mut pcg: ResMut<Pcg64>) {
 
 pub fn load_field(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     game: ResMut<Game>,
     mut advance_round_events: EventWriter<AdvanceRound>,
+    fonts: Res<Assets<Font>>,
+    images: Res<Assets<Image>>,
 ) {
     const AXIS_THICKNESS: f32 = 0.04;
     const GRID_THICKNESS: f32 = 0.02;
@@ -383,11 +384,8 @@ pub fn load_field(
             ..Default::default()
         };
 
-        let label_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
-            color: Color::BLACK,
-            font_size: 0.0,
-        };
+        let label_style =
+            TextStyle { font: fonts.get_handle(asset::Font), color: Color::BLACK, font_size: 0.0 };
         let label_alignment_x =
             TextAlignment { vertical: VerticalAlign::Top, horizontal: HorizontalAlign::Center };
         let label_alignment_y =
@@ -429,11 +427,8 @@ pub fn load_field(
             }
         }
 
-        let score_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
-            color: Color::BLACK,
-            font_size: 0.0,
-        };
+        let score_style =
+            TextStyle { font: fonts.get_handle(asset::Font), color: Color::BLACK, font_size: 0.0 };
         let score_alignment =
             TextAlignment { vertical: VerticalAlign::Center, horizontal: HorizontalAlign::Center };
 
@@ -442,7 +437,7 @@ pub fn load_field(
             // Player icon
             node.spawn_bundle(SpriteBundle {
                 sprite: Sprite { custom_size: Some(Vec2::ONE), ..Default::default() },
-                texture: asset_server.load(&format!("player{}.png", i + 1)),
+                texture: images.get_handle(asset::Player(i as u32)),
                 transform: Transform::from_translation((*pos * scale).extend(z::PLAYER))
                     .with_scale(Vec3::from([0.4; 3])),
                 ..Default::default()
@@ -482,52 +477,52 @@ fn move_players(
     }
 }
 
-enum TexFn<'a> {
-    Str(&'a str),
-    Between(&'a str, &'a str),
+enum TexFn {
+    Asset(asset::Asset),
+    AssetU32(fn(u32) -> asset::Asset),
 }
 
-impl<'a> TexFn<'a> {
-    fn call(&self, param: u32) -> String {
+impl TexFn {
+    fn call(&self, param: u32) -> asset::Asset {
         match self {
-            Self::Str(s) => (*s).into(),
-            Self::Between(s, t) => format!("{}{}{}", s, param, t),
+            Self::Asset(s) => *s,
+            Self::AssetU32(s) => s(param),
         }
     }
 }
 
 struct ItemParams {
     color: Color,
-    texture: TexFn<'static>,
+    texture: TexFn,
     scale_multiplier: f32,
     interaction_layers: CollisionGroups,
 }
 
 const ITEM_BALL: ItemParams = ItemParams {
     color: Color::WHITE,
-    texture: TexFn::Str("ball.png"),
+    texture: TexFn::Asset(asset::Ball),
     scale_multiplier: 1.375,
     interaction_layers: CollisionGroups::BALL,
 };
 
 const ITEM_MINE: ItemParams = ItemParams {
     color: Color::WHITE,
-    texture: TexFn::Str("mine.png"),
+    texture: TexFn::Asset(asset::Mine),
     scale_multiplier: 1.375,
     interaction_layers: CollisionGroups::MINE,
 };
 
 const ITEM_PLAYER_BALL: ItemParams = ItemParams {
     color: Color::rgb(0.8, 0.8, 0.8),
-    texture: TexFn::Between("player", ".png"),
+    texture: TexFn::AssetU32(asset::Player),
     scale_multiplier: 1.0,
     interaction_layers: CollisionGroups::BALL,
 };
 
 fn init_enter_functions(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut rng: ResMut<Pcg64>,
+    images: Res<Assets<Image>>,
     game: Res<Game>,
     players: Res<Vec<Player>>,
     items: Query<Entity, Or<(With<Ball>, With<Mine>, With<Graph>)>>,
@@ -542,7 +537,7 @@ fn init_enter_functions(
 
     fn spawn_item<'a, 'w, 's, 'b>(
         node: &'b mut ChildBuilder<'w, 's, 'a>,
-        asset_server: &Res<AssetServer>,
+        images: &Res<Assets<Image>>,
         point: Vec3,
         item_params: &ItemParams,
         param: u32,
@@ -555,7 +550,7 @@ fn init_enter_functions(
                 custom_size: Some(Vec2::ONE),
                 ..Default::default()
             },
-            texture: asset_server.load(&item_params.texture.call(param)),
+            texture: images.get_handle(item_params.texture.call(param)),
             transform: Transform::from_translation(point)
                 .with_scale(Vec3::from([scale * item_params.scale_multiplier; 3])),
             ..Default::default()
@@ -592,10 +587,10 @@ fn init_enter_functions(
                 for point in points.take(player.num_balls as usize) {
                     spawn_item(
                         node,
-                        &asset_server,
+                        &images,
                         point.extend(z::BALL),
                         &ITEM_PLAYER_BALL,
-                        i as u32 + 1,
+                        i as u32,
                     )
                     .insert(Owner(i as u32))
                     .insert(Ball);
@@ -604,11 +599,11 @@ fn init_enter_functions(
         } else {
             let points = (&item_distribution).sample_iter(&mut *rng);
             for point in points.take(85) {
-                spawn_item(node, &asset_server, point.extend(z::BALL), &ITEM_BALL, 0).insert(Ball);
+                spawn_item(node, &images, point.extend(z::BALL), &ITEM_BALL, 0).insert(Ball);
             }
             let points = (&item_distribution).sample_iter(&mut *rng);
             for point in points.take(15) {
-                spawn_item(node, &asset_server, point.extend(z::MINE), &ITEM_MINE, 0).insert(Mine);
+                spawn_item(node, &images, point.extend(z::MINE), &ITEM_MINE, 0).insert(Mine);
             }
         }
     });
@@ -621,7 +616,7 @@ fn update_scores(mut scores: Query<(&mut Text, &Owner), With<Score>>, players: R
 }
 
 fn show_winner(
-    asset_server: Res<AssetServer>,
+    fonts: Res<Assets<Font>>,
     rockets: Query<&Rocket>,
     game: Res<Game>,
     players: Res<Vec<Player>>,
@@ -645,7 +640,8 @@ fn show_winner(
             },
             transform: Transform::from_xyz(0.0, 0.0, z::WINNER_BOX),
             ..Default::default()
-        }).insert(WinnerBox);
+        })
+        .insert(WinnerBox);
 
         let max_score = players.iter().map(|p| p.num_balls).max().unwrap();
         let mut winner_text = players
@@ -661,7 +657,7 @@ fn show_winner(
                 winner_text,
                 TextStyle {
                     color: Color::WHITE,
-                    font: asset_server.load("NotoMono-Regular.ttf"),
+                    font: fonts.get_handle(asset::Font),
                     font_size: 0.0,
                 },
                 TextAlignment {

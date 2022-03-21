@@ -10,6 +10,7 @@ use pest::{
 use std::{iter, time::Duration};
 
 use crate::{
+    asset,
     collision::{CollisionGroups, PrevPosition},
     time::{DelayedEvent, DelayedEventBundle},
     ui::{
@@ -573,7 +574,7 @@ pub fn fire_rockets(
     >,
     mut players: ResMut<Vec<Player>>,
     player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
-    asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
     field: Query<Entity, With<Field>>,
 ) {
     for (owner, mut textbox) in textboxes_fx.iter_mut() {
@@ -605,7 +606,7 @@ pub fn fire_rockets(
             let rocket = node
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite { custom_size: Some(Vec2::new(2.8, 1.4)), ..Default::default() },
-                    texture: asset_server.load(&format!("rocket{}.png", player + 1)),
+                    texture: images.get_handle(asset::Rocket(owner.0)),
                     transform: Transform::from(*transform).with_scale([scale; 3].into()),
                     ..Default::default()
                 })

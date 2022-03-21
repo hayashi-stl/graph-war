@@ -5,6 +5,7 @@ use egui::Align2;
 use fxhash::FxHashMap;
 
 use crate::{
+    asset,
     graph::{SendFunctions, QUICK_HELP},
     time::{AdvanceRound, AdvanceTurn},
     Field, Game, Owner, PlayState, Player,
@@ -24,21 +25,18 @@ fn enter_function_text(player_index: u32) -> String {
 
 trait EntityCommandsExt {
     /// Menu UI
-    fn spawn_menu_ui(&mut self, asset_server: &Res<AssetServer>) -> &mut Self;
+    fn spawn_menu_ui(
+        &mut self,
+        fonts: &Res<Assets<Font>>,
+        images: &Res<Assets<Image>>,
+    ) -> &mut Self;
 
     /// UI for inputting a function
-    fn spawn_function_ui(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-        player_index: u32,
-    ) -> &mut Self;
+    fn spawn_function_ui(&mut self, fonts: &Res<Assets<Font>>, player_index: u32) -> &mut Self;
 
     /// Shows what a player inputted
-    fn spawn_function_display(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-        player_index: u32,
-    ) -> &mut Self;
+    fn spawn_function_display(&mut self, fonts: &Res<Assets<Font>>, player_index: u32)
+        -> &mut Self;
 
     fn maybe_insert(&mut self, component: Option<impl Component>) -> &mut Self;
 }
@@ -52,9 +50,13 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         }
     }
 
-    fn spawn_menu_ui(&mut self, asset_server: &Res<AssetServer>) -> &mut Self {
+    fn spawn_menu_ui(
+        &mut self,
+        fonts: &Res<Assets<Font>>,
+        images: &Res<Assets<Image>>,
+    ) -> &mut Self {
         let button_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: 38.0,
             color: Color::BLACK,
         };
@@ -83,7 +85,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         .with_children(|node| {
             node.spawn_bundle(ImageBundle {
                 style: Style { margin: Rect::all(Val::Px(20.0)), ..Default::default() },
-                image: UiImage(asset_server.load("title.png")),
+                image: UiImage(images.get_handle(asset::Title)),
                 ..Default::default()
             });
 
@@ -115,13 +117,9 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         })
     }
 
-    fn spawn_function_ui(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-        player_index: u32,
-    ) -> &mut Self {
+    fn spawn_function_ui(&mut self, fonts: &Res<Assets<Font>>, player_index: u32) -> &mut Self {
         let function_label_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
@@ -129,13 +127,13 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             TextAlignment { horizontal: HorizontalAlign::Center, vertical: VerticalAlign::Center };
 
         let left_side_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
 
         let button_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: 28.0,
             color: Color::BLACK,
         };
@@ -290,13 +288,9 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         })
     }
 
-    fn spawn_function_display(
-        &mut self,
-        asset_server: &Res<AssetServer>,
-        num_players: u32,
-    ) -> &mut Self {
+    fn spawn_function_display(&mut self, fonts: &Res<Assets<Font>>, num_players: u32) -> &mut Self {
         let function_label_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
@@ -304,7 +298,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
             TextAlignment { horizontal: HorizontalAlign::Center, vertical: VerticalAlign::Center };
 
         let left_side_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: FONT_SIZE,
             color: Color::BLACK,
         };
@@ -435,7 +429,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         }
 
         let button_style = TextStyle {
-            font: asset_server.load("NotoMono-Regular.ttf"),
+            font: fonts.get_handle("NotoMono-Regular.ttf"),
             font_size: 28.0,
             color: Color::BLACK,
         };
@@ -467,11 +461,11 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     }
 }
 
-pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn load_ui(mut commands: Commands, fonts: Res<Assets<Font>>, images: Res<Assets<Image>>) {
     commands.spawn_bundle(UiCameraBundle::default()).insert(UiCamera);
 
     // Menu
-    commands.spawn().spawn_menu_ui(&asset_server).insert(MenuScreen);
+    commands.spawn().spawn_menu_ui(&fonts, &images).insert(MenuScreen);
 
     commands
         .spawn_bundle(NodeBundle {
@@ -523,7 +517,7 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..Default::default()
             })
             .insert(FunctionDisplay)
-            .spawn_function_display(&asset_server, 4);
+            .spawn_function_display(&fonts, 4);
 
             // Function entry
             node.spawn_bundle(NodeBundle {
@@ -540,7 +534,7 @@ pub fn load_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..Default::default()
             })
             .insert(FunctionUi)
-            .spawn_function_ui(&asset_server, 0);
+            .spawn_function_ui(&fonts, 0);
         })
         .insert(GameScreen);
 }

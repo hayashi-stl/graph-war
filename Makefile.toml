@@ -6,16 +6,30 @@ RUN_MODE = ""
 BUILD_MODE = "--release"
 RUN_MODE = "--release"
 
+[tasks.fmt]
+script = ["cargo fmt"]
+
 [tasks.build]
 clear = true
 script = ["cargo build ${BUILD_MODE} ${@}"]
+dependencies = ["fmt"]
 
 [tasks.run]
 clear = true
 script = ["cargo run ${RUN_MODE} ${@}"]
+dependencies = ["fmt"]
 
 [tasks.wasm]
 script = ["wasm-pack build ${BUILD_MODE} --target web"]
+dependencies = ["fmt"]
+
+[tasks.wasm-zip]
+script = ["zip -r game.zip index.html pkg assets"]
+dependencies = ["wasm"]
+
+[tasks.itchio]
+script = ["butler push game.zip josh65536/graph-war:web"]
+dependencies = ["wasm-zip"]
 
 [tasks.default]
 clear = true
