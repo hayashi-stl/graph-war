@@ -585,15 +585,9 @@ fn init_enter_functions(
             for (i, player) in players.iter().enumerate() {
                 let points = (&item_distribution).sample_iter(&mut *rng);
                 for point in points.take(player.num_balls as usize) {
-                    spawn_item(
-                        node,
-                        &images,
-                        point.extend(z::BALL),
-                        &ITEM_PLAYER_BALL,
-                        i as u32,
-                    )
-                    .insert(Owner(i as u32))
-                    .insert(Ball);
+                    spawn_item(node, &images, point.extend(z::BALL), &ITEM_PLAYER_BALL, i as u32)
+                        .insert(Owner(i as u32))
+                        .insert(Ball);
                 }
             }
         } else {
