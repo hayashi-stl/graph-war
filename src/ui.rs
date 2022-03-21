@@ -55,7 +55,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
     fn spawn_menu_ui(&mut self, asset_server: &Res<AssetServer>) -> &mut Self {
         let button_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 28.0,
+            font_size: 38.0,
             color: Color::BLACK,
         };
 
@@ -82,7 +82,7 @@ impl<'w, 's, 'a> EntityCommandsExt for EntityCommands<'w, 's, 'a> {
         })
         .with_children(|node| {
             node.spawn_bundle(ImageBundle {
-                style: Style { margin: Rect::all(Val::Px(10.0)), ..Default::default() },
+                style: Style { margin: Rect::all(Val::Px(20.0)), ..Default::default() },
                 image: UiImage(asset_server.load("title.png")),
                 ..Default::default()
             });
