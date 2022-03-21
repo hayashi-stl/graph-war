@@ -18,7 +18,7 @@ use bevy::{
 };
 use bevy_egui::EguiPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
-use graph::{Graph, Parametric};
+use graph::{Graph, Parametric, Rocket};
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
 use rand::{distributions::Uniform, prelude::Distribution};
@@ -79,6 +79,9 @@ pub struct Ball;
 
 #[derive(Component)]
 pub struct Mine;
+
+#[derive(Component)]
+pub struct WinnerBox;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PlayState {
@@ -235,6 +238,10 @@ pub fn run() {
         )
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
+                .with_system(show_winner)
+        )
+        .add_system_set(
+            SystemSet::on_update(PlayState::Fire)
                 .before(PhysicsSystems::StepWorld)
                 .with_system(graph::move_rockets.label(Label::MoveRockets))
                 .with_system(ui::update_next_round_button.label(Label::AdvanceRoundButton))
@@ -264,6 +271,8 @@ pub mod z {
     pub const MINE: f32 = 3.0;
     pub const ROCKET: f32 = 4.0;
     pub const SCORE: f32 = 5.0;
+    pub const WINNER_BOX: f32 = 6.0;
+    pub const WINNER: f32 = 6.0;
 }
 
 /// Configuration for a field, containing player positions
@@ -376,8 +385,8 @@ pub fn load_field(
 
         let label_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 0.0, // will be filled in by RelativeTextSize
             color: Color::BLACK,
+            font_size: 0.0,
         };
         let label_alignment_x =
             TextAlignment { vertical: VerticalAlign::Top, horizontal: HorizontalAlign::Center };
@@ -422,8 +431,8 @@ pub fn load_field(
 
         let score_style = TextStyle {
             font: asset_server.load("NotoMono-Regular.ttf"),
-            font_size: 0.0, // will be filled in by RelativeTextSize
             color: Color::BLACK,
+            font_size: 0.0,
         };
         let score_alignment =
             TextAlignment { vertical: VerticalAlign::Center, horizontal: HorizontalAlign::Center };
@@ -488,24 +497,28 @@ impl<'a> TexFn<'a> {
 }
 
 struct ItemParams {
+    color: Color,
     texture: TexFn<'static>,
     scale_multiplier: f32,
     interaction_layers: CollisionGroups,
 }
 
 const ITEM_BALL: ItemParams = ItemParams {
+    color: Color::WHITE,
     texture: TexFn::Str("ball.png"),
     scale_multiplier: 1.375,
     interaction_layers: CollisionGroups::BALL,
 };
 
 const ITEM_MINE: ItemParams = ItemParams {
+    color: Color::WHITE,
     texture: TexFn::Str("mine.png"),
     scale_multiplier: 1.375,
     interaction_layers: CollisionGroups::MINE,
 };
 
 const ITEM_PLAYER_BALL: ItemParams = ItemParams {
+    color: Color::rgb(0.8, 0.8, 0.8),
     texture: TexFn::Between("player", ".png"),
     scale_multiplier: 1.0,
     interaction_layers: CollisionGroups::BALL,
@@ -537,7 +550,11 @@ fn init_enter_functions(
         let scale = 0.3;
 
         let mut entity_commands = node.spawn_bundle(SpriteBundle {
-            sprite: Sprite { custom_size: Some(Vec2::ONE), ..Default::default() },
+            sprite: Sprite {
+                color: item_params.color,
+                custom_size: Some(Vec2::ONE),
+                ..Default::default()
+            },
             texture: asset_server.load(&item_params.texture.call(param)),
             transform: Transform::from_translation(point)
                 .with_scale(Vec3::from([scale * item_params.scale_multiplier; 3])),
@@ -601,6 +618,62 @@ fn update_scores(mut scores: Query<(&mut Text, &Owner), With<Score>>, players: R
     for (mut text, player_index) in scores.iter_mut() {
         text.sections[0].value = players[player_index.0 as usize].num_balls.to_string();
     }
+}
+
+fn show_winner(
+    asset_server: Res<AssetServer>,
+    rockets: Query<&Rocket>,
+    game: Res<Game>,
+    players: Res<Vec<Player>>,
+    winner_box: Query<&WinnerBox>,
+    field: Query<Entity, With<Field>>,
+    mut commands: Commands,
+) {
+    if rockets.iter().next().is_some()
+        || winner_box.iter().next().is_some()
+        || !game.is_on_destruction_round()
+    {
+        return;
+    }
+
+    commands.entity(field.single()).with_children(|node| {
+        node.spawn_bundle(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.0, 0.0, 0.0, 0.5),
+                custom_size: Some(Vec2::new(1.0, 0.35) * game.scale),
+                ..Default::default()
+            },
+            transform: Transform::from_xyz(0.0, 0.0, z::WINNER_BOX),
+            ..Default::default()
+        }).insert(WinnerBox);
+
+        let max_score = players.iter().map(|p| p.num_balls).max().unwrap();
+        let mut winner_text = players
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| (p.num_balls == max_score).then(|| format!("P{}, ", i + 1)))
+            .collect::<String>();
+        winner_text = format!("Winners:\n{}", winner_text);
+        winner_text.truncate(winner_text.len() - 2); // Remove final ", "
+
+        node.spawn_bundle(Text2dBundle {
+            text: Text::with_section(
+                winner_text,
+                TextStyle {
+                    color: Color::WHITE,
+                    font: asset_server.load("NotoMono-Regular.ttf"),
+                    font_size: 0.0,
+                },
+                TextAlignment {
+                    horizontal: HorizontalAlign::Center,
+                    vertical: VerticalAlign::Center,
+                },
+            ),
+            transform: Transform::from_xyz(0.0, 0.0, z::WINNER),
+            ..Default::default()
+        })
+        .insert(RelativeTextSize(0.5));
+    });
 }
 
 /// Text size relative to camera
