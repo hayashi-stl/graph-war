@@ -29,6 +29,7 @@ assets! {
     pub enum Asset {
         Title => ("title.png"),
         Ball => ("ball.png"),
+        Boom => ("boom.png"),
         Mine => ("mine.png"),
         Player(*i: u32) => ("player{}.png", *i + 1),
         Rocket(*i: u32) => ("rocket{}.png", *i + 1),
@@ -44,7 +45,7 @@ impl From<Asset> for HandleId {
 
 pub fn load_assets(asset_server: Res<AssetServer>, mut used_assets: ResMut<Vec<HandleUntyped>>) {
     // load_folder doesn't work in wasm
-    for asset_path in ["ball.png", "mine.png", "title.png", "NotoMono-Regular.ttf"]
+    for asset_path in ["ball.png", "boom.png", "mine.png", "title.png", "NotoMono-Regular.ttf"]
         .into_iter()
         .map(|s| s.to_owned())
         .chain((1..=4).map(|i| format!("player{}.png", i)))

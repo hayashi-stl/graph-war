@@ -15,12 +15,6 @@ bitflags! {
     }
 }
 
-pub fn handle_collisions(mut item_events: EventReader<ContactEvent>) {
-    for event in item_events.iter() {
-        log::info!("Collision event: {:?}", event);
-    }
-}
-
 /// Previous position of an object
 #[derive(Component)]
 pub struct PrevPosition(pub Vec2);
@@ -29,6 +23,12 @@ pub fn update_prev_positions(mut positions: Query<(&mut PrevPosition, &GlobalTra
     for (mut prev, curr) in positions.iter_mut() {
         prev.0 = curr.translation.xy();
     }
+}
+
+/// Rocket collision event
+pub struct RocketCollision {
+    pub rocket: Entity,
+    pub other: Entity,
 }
 
 pub fn collect_balls(
@@ -48,6 +48,7 @@ pub fn collect_balls(
     mines: Query<&Mine>,
     mut commands: Commands,
     mut players: ResMut<Vec<Player>>,
+    mut rocket_collisions: EventWriter<RocketCollision>,
 ) {
     let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
@@ -147,6 +148,7 @@ pub fn collect_balls(
                 live_rockets[other_player_index as usize] = false;
                 tois[player_index as usize] = Some(toi);
                 tois[other_player_index as usize] = Some(toi);
+                rocket_collisions.send(RocketCollision { rocket, other: item });
             }
         } else if live_rockets[player_index as usize] && items_reached.insert(item) {
             commands.entity(item).despawn_recursive();
@@ -163,6 +165,7 @@ pub fn collect_balls(
                 commands.entity(rocket).despawn_recursive();
                 live_rockets[player_index as usize] = false;
                 tois[player_index as usize] = Some(toi);
+                rocket_collisions.send(RocketCollision { rocket, other: item });
             }
         }
     }

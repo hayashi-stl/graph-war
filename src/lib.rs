@@ -6,6 +6,7 @@ extern crate pest_derive;
 
 pub mod asset;
 pub mod collision;
+pub mod effects;
 pub mod graph;
 pub mod random;
 pub mod time;
@@ -202,6 +203,7 @@ pub fn run() {
         .add_event::<graph::SendFunctions>()
         .add_event::<time::AdvanceTurn>()
         .add_event::<time::AdvanceRound>()
+        .add_event::<collision::RocketCollision>()
         .add_stage_before(
             CoreStage::PreUpdate,
             Stage::AdvanceTimers,
@@ -250,11 +252,12 @@ pub fn run() {
         .add_system_set(
             SystemSet::on_update(PlayState::Fire)
                 .after(PhysicsSystems::StepWorld)
-                .with_system(collision::handle_collisions)
                 .with_system(collision::collect_balls.label(Label::CollectItems))
+                .with_system(effects::spawn_boom.label(Label::CollectItems))
                 .with_system(graph::graph_functions.after(Label::CollectItems))
                 .with_system(update_scores.after(Label::CollectItems)),
         )
+        .add_system_set(SystemSet::on_exit(PlayState::Fire).with_system(effects::remove_effects))
         .add_system(ui::advance_turn.label(Label::AdvanceTurn).after(Label::CollectItems))
         .add_system_to_stage(CoreStage::PostUpdate, ui::assign_egui_ids)
         .add_system_to_stage(CoreStage::PostUpdate, ui::give_back_egui_ids)
@@ -265,7 +268,8 @@ pub fn run() {
 pub mod z {
     pub const GRID: f32 = 0.0;
     pub const GRID_TEXT: f32 = 1.0;
-    pub const GRAPH: f32 = 2.0;
+    pub const GRAPH: f32 = 1.5;
+    pub const BOOM: f32 = 1.7;
     pub const PLAYER: f32 = 2.0;
     pub const BALL: f32 = 2.0;
     pub const MINE: f32 = 3.0;
