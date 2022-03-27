@@ -19,6 +19,7 @@ use bevy::{
     render::camera::ScalingMode,
 };
 use bevy_egui::EguiPlugin;
+use bevy_kira_audio::AudioPlugin;
 use bevy_rapier2d::{physics::PhysicsSystems, prelude::*};
 use graph::{Graph, Parametric, Rocket};
 use once_cell::sync::Lazy;
@@ -196,6 +197,7 @@ pub fn run() {
         .insert_resource(vec![] as Vec<HandleUntyped>)
         .add_state(PlayState::Menu)
         .add_plugins(DefaultPlugins)
+        .add_plugin(AudioPlugin)
         //.add_plugin(WorldInspectorPlugin::new())
         //.register_inspectable::<ui::EguiId>()
         .add_plugin(EguiPlugin)

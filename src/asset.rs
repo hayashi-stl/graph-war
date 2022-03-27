@@ -34,6 +34,8 @@ assets! {
         Player(*i: u32) => ("player{}.png", *i + 1),
         Rocket(*i: u32) => ("rocket{}.png", *i + 1),
         Font => ("NotoMono-Regular.ttf"),
+        BallPickup => ("ball_pickup.ogg"),
+        PlayerBallPickup => ("player_ball_pickup.ogg"),
     }
 }
 
@@ -45,11 +47,19 @@ impl From<Asset> for HandleId {
 
 pub fn load_assets(asset_server: Res<AssetServer>, mut used_assets: ResMut<Vec<HandleUntyped>>) {
     // load_folder doesn't work in wasm
-    for asset_path in ["ball.png", "boom.png", "mine.png", "title.png", "NotoMono-Regular.ttf"]
-        .into_iter()
-        .map(|s| s.to_owned())
-        .chain((1..=4).map(|i| format!("player{}.png", i)))
-        .chain((1..=4).map(|i| format!("rocket{}.png", i)))
+    for asset_path in [
+        "ball.png",
+        "boom.png",
+        "mine.png",
+        "title.png",
+        "NotoMono-Regular.ttf",
+        "ball_pickup.ogg",
+        "player_ball_pickup.ogg",
+    ]
+    .into_iter()
+    .map(|s| s.to_owned())
+    .chain((1..=4).map(|i| format!("player{}.png", i)))
+    .chain((1..=4).map(|i| format!("rocket{}.png", i)))
     {
         used_assets.push(asset_server.load_untyped(&asset_path));
     }

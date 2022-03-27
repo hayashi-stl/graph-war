@@ -1,10 +1,11 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
+use bevy_kira_audio::{Audio, AudioSource};
 use bevy_rapier2d::prelude::*;
 use bitflags::bitflags;
 use decorum::Total;
 use fxhash::FxHashSet;
 
-use crate::{Ball, Mine, Owner, Player};
+use crate::{asset, Ball, Mine, Owner, Player};
 
 bitflags! {
     pub struct CollisionGroups: u32 {
@@ -49,6 +50,8 @@ pub fn collect_balls(
     mut commands: Commands,
     mut players: ResMut<Vec<Player>>,
     mut rocket_collisions: EventWriter<RocketCollision>,
+    audio: Res<Audio>,
+    sounds: Res<Assets<AudioSource>>,
 ) {
     let collider_set = QueryPipelineColliderComponentsSet(&collider_query);
 
@@ -157,9 +160,11 @@ pub fn collect_balls(
                 if let Ok(owner) = owned.get(item) {
                     // Destruction round
                     players[owner.0 as usize].num_balls -= 1;
+                    audio.play(sounds.get_handle(asset::PlayerBallPickup));
                 } else {
                     // Normal round
                     players[player_index as usize].num_balls += 1;
+                    audio.play(sounds.get_handle(asset::BallPickup));
                 }
             } else if mines.get(item).is_ok() {
                 commands.entity(rocket).despawn_recursive();

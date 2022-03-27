@@ -15,7 +15,10 @@
    version="1.1"
    id="svg8"
    inkscape:version="0.92.5 (2060ec1f9f, 2020-04-08)"
-   sodipodi:docname="boom.svg">
+   sodipodi:docname="boom.svg"
+   inkscape:export-filename="/home/joshua/rust/graph-war/assets/boom.png"
+   inkscape:export-xdpi="95.900002"
+   inkscape:export-ydpi="95.900002">
   <defs
      id="defs2" />
   <sodipodi:namedview

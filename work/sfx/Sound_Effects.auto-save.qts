@@ -1,0 +1,161 @@
+<!DOCTYPE qtractorSession>
+<session version="Qtractor 0.9.24.13git.93b59f" name="Sound Effects">
+ <properties>
+  <directory>/home/joshua/rust/graph-war/work/sfx</directory>
+  <description></description>
+  <sample-rate>44100</sample-rate>
+  <tempo>120</tempo>
+  <ticks-per-beat>960</ticks-per-beat>
+  <beats-per-bar>4</beats-per-bar>
+  <beat-divisor>2</beat-divisor>
+ </properties>
+ <state>
+  <loop-start>0</loop-start>
+  <loop-end>0</loop-end>
+  <punch-in>0</punch-in>
+  <punch-out>0</punch-out>
+ </state>
+ <files>
+  <audio-list/>
+  <midi-list>
+   <file name="Sound_Effects-Track_1-1.mid">Sound_Effects-Track_1-1.mid</file>
+  </midi-list>
+ </files>
+ <devices>
+  <audio-engine>
+   <audio-control>
+    <transport-mode>duplex</transport-mode>
+    <timebase>1</timebase>
+   </audio-control>
+   <audio-bus mode="duplex" name="Master">
+    <monitor>0</monitor>
+    <channels>2</channels>
+    <auto-connect>1</auto-connect>
+    <input-gain>1</input-gain>
+    <input-panning>0</input-panning>
+    <input-controllers/>
+    <input-plugins/>
+    <input-connects>
+     <connect index="0">
+      <client>system</client>
+      <port>capture_1</port>
+     </connect>
+     <connect index="1">
+      <client>system</client>
+      <port>capture_2</port>
+     </connect>
+    </input-connects>
+    <output-gain>1</output-gain>
+    <output-panning>0</output-panning>
+    <output-controllers/>
+    <output-plugins/>
+    <output-connects>
+     <connect index="0">
+      <client>system</client>
+      <port>playback_1</port>
+     </connect>
+     <connect index="1">
+      <client>system</client>
+      <port>playback_2</port>
+     </connect>
+    </output-connects>
+   </audio-bus>
+  </audio-engine>
+  <midi-engine>
+   <midi-control>
+    <mmc-mode>duplex</mmc-mode>
+    <mmc-device>127</mmc-device>
+    <spp-mode>duplex</spp-mode>
+    <clock-mode>none</clock-mode>
+   </midi-control>
+   <midi-bus mode="duplex" name="Master">
+    <monitor>0</monitor>
+    <input-gain>1</input-gain>
+    <input-panning>0</input-panning>
+    <input-controllers/>
+    <input-plugins>
+     <audio-output-bus>0</audio-output-bus>
+     <audio-output-auto-connect>1</audio-output-auto-connect>
+    </input-plugins>
+    <input-connects/>
+    <output-gain>1</output-gain>
+    <output-panning>0</output-panning>
+    <output-controllers/>
+    <output-plugins>
+     <audio-output-bus>0</audio-output-bus>
+     <audio-output-auto-connect>1</audio-output-auto-connect>
+    </output-plugins>
+    <output-connects/>
+    <midi-map>
+     <midi-patch channel="1">
+      <midi-bank-sel-method>0</midi-bank-sel-method>
+     </midi-patch>
+     <midi-patch channel="0">
+      <midi-bank-sel-method>0</midi-bank-sel-method>
+     </midi-patch>
+    </midi-map>
+   </midi-bus>
+  </midi-engine>
+ </devices>
+ <tracks>
+  <view>
+   <pixels-per-beat>32</pixels-per-beat>
+   <horizontal-zoom>380</horizontal-zoom>
+   <vertical-zoom>100</vertical-zoom>
+   <snap-per-beat>4</snap-per-beat>
+   <edit-head>0</edit-head>
+   <edit-tail>0</edit-tail>
+  </view>
+  <track type="midi" name="Track 1">
+   <properties>
+    <input-bus>Master</input-bus>
+    <output-bus>Master</output-bus>
+    <midi-omni>0</midi-omni>
+    <midi-channel>0</midi-channel>
+    <midi-bank-sel-method>0</midi-bank-sel-method>
+    <midi-drums>0</midi-drums>
+   </properties>
+   <state>
+    <mute>0</mute>
+    <solo>0</solo>
+    <record>0</record>
+    <monitor>0</monitor>
+    <gain>1</gain>
+    <panning>0</panning>
+   </state>
+   <view>
+    <height>96</height>
+    <background-color>#ccffff</background-color>
+    <foreground-color>#667f7f</foreground-color>
+   </view>
+   <controllers/>
+   <curve-file/>
+   <clips>
+    <clip name="Sound_Effects-Track_1-1">
+     <properties>
+      <name>Sound_Effects-Track_1-1</name>
+      <start>0</start>
+      <offset>0</offset>
+      <length>33075</length>
+      <gain>1</gain>
+      <panning>0</panning>
+      <fade-in type="InQuad">0</fade-in>
+      <fade-out type="OutQuad">0</fade-out>
+     </properties>
+     <midi-clip>
+      <filename>Sound_Effects-Track_1-1.mid</filename>
+      <track-channel>1</track-channel>
+      <revision>3</revision>
+      <editor-pos>546,198</editor-pos>
+      <editor-horizontal-zoom>200</editor-horizontal-zoom>
+     </midi-clip>
+    </clip>
+   </clips>
+   <plugins>
+    <audio-output-bus>0</audio-output-bus>
+    <audio-output-auto-connect>1</audio-output-auto-connect>
+   </plugins>
+  </track>
+ </tracks>
+</session>
+
