@@ -36,6 +36,10 @@ assets! {
         Font => ("NotoMono-Regular.ttf"),
         BallPickup => ("ball_pickup.ogg"),
         PlayerBallPickup => ("player_ball_pickup.ogg"),
+        Explosion => ("explosion.ogg"),
+        //RocketMove => ("rocket_move.ogg"),
+        RocketMove(*i: u32) => ("rocket_move{}.ogg", *i + 1),
+        Fire => ("fire.ogg"),
     }
 }
 
@@ -55,11 +59,15 @@ pub fn load_assets(asset_server: Res<AssetServer>, mut used_assets: ResMut<Vec<H
         "NotoMono-Regular.ttf",
         "ball_pickup.ogg",
         "player_ball_pickup.ogg",
+        "explosion.ogg",
+        "fire.ogg",
+        //"rocket_move.ogg",
     ]
     .into_iter()
     .map(|s| s.to_owned())
     .chain((1..=4).map(|i| format!("player{}.png", i)))
     .chain((1..=4).map(|i| format!("rocket{}.png", i)))
+    .chain((1..=4).map(|i| format!("rocket_move{}.ogg", i)))
     {
         used_assets.push(asset_server.load_untyped(&asset_path));
     }

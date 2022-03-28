@@ -206,6 +206,7 @@ pub fn run() {
         .add_event::<time::AdvanceTurn>()
         .add_event::<time::AdvanceRound>()
         .add_event::<collision::RocketCollision>()
+        .add_event::<graph::RocketTimeUp>()
         .add_stage_before(
             CoreStage::PreUpdate,
             Stage::AdvanceTimers,
@@ -255,7 +256,8 @@ pub fn run() {
             SystemSet::on_update(PlayState::Fire)
                 .after(PhysicsSystems::StepWorld)
                 .with_system(collision::collect_balls.label(Label::CollectItems))
-                .with_system(effects::spawn_boom.label(Label::CollectItems))
+                .with_system(effects::spawn_boom.after(Label::CollectItems))
+                .with_system(graph::stop_rocket_sounds.after(Label::CollectItems))
                 .with_system(graph::graph_functions.after(Label::CollectItems))
                 .with_system(update_scores.after(Label::CollectItems)),
         )

@@ -1,4 +1,5 @@
 use bevy::{math::Vec3Swizzles, prelude::*};
+use bevy_kira_audio::{Audio, AudioChannel, AudioSource};
 use bevy_rapier2d::prelude::*;
 use fxhash::FxHashMap;
 use once_cell::sync::Lazy;
@@ -11,13 +12,13 @@ use std::{iter, time::Duration};
 
 use crate::{
     asset,
-    collision::{CollisionGroups, PrevPosition},
+    collision::{CollisionGroups, PrevPosition, RocketCollision},
     time::{DelayedEvent, DelayedEventBundle},
     ui::{
         ButtonsEnabled, FunctionDisplayBox, FunctionEntryBox, FunctionStatus, FunctionWhere,
         FunctionX, FunctionY, Textbox, TextboxesEditable,
     },
-    z, Field, Owner, Player, PlayerLabel,
+    z, Field, Game, Owner, Player, PlayerLabel,
 };
 
 pub const QUICK_HELP: &str = r"
@@ -161,7 +162,7 @@ pub enum Function {
 #[derive(Component)]
 pub struct Rocket;
 
-const ROCKET_TIME: f64 = 5.0;
+const ROCKET_TIME: f32 = 5.0;
 
 /// The offset of a rocket from the parametric equation it follows
 #[derive(Component)]
@@ -552,12 +553,21 @@ pub fn send_functions(
     }
 }
 
+/// t reached 1, so the rocket's time is up. This is an event.
+pub struct RocketTimeUp {
+    pub rocket: Entity,
+}
+
 /// Labels a graph constructed by a rocket.
 #[derive(Component)]
 pub struct Graph {
     color: Color,
     rocket: Entity,
 }
+
+/// Audio channel for a rocket.
+#[derive(Component)]
+pub struct RocketChannel(pub AudioChannel);
 
 const GRAPH_COLORS: [Color; 4] = [Color::RED, Color::CYAN, Color::YELLOW, Color::GREEN];
 
@@ -576,6 +586,8 @@ pub fn fire_rockets(
     player_comps: Query<(&Owner, &GlobalTransform), With<PlayerLabel>>,
     images: Res<Assets<Image>>,
     field: Query<Entity, With<Field>>,
+    audio: Res<Audio>,
+    sounds: Res<Assets<AudioSource>>,
 ) {
     for (owner, mut textbox) in textboxes_fx.iter_mut() {
         if let Some(player) = players.get_mut(owner.0 as usize) {
@@ -596,13 +608,20 @@ pub fn fire_rockets(
         }
     }
 
+    let fire_channel = AudioChannel::new("Fire".into());
+    audio.play_in_channel(sounds.get_handle(asset::Fire), &fire_channel);
+    audio.set_volume_in_channel(2.0, &fire_channel);
+
     commands.entity(field.single()).with_children(|node| {
         for (owner, transform) in player_comps.iter() {
             let player = owner.0;
             let parametric = players[player as usize].parametric.take().unwrap();
             let start = parametric.eval(0.0);
-
             let scale = 0.3;
+
+            let channel = AudioChannel::new(owner.0.to_string());
+            audio.play_looped_in_channel(sounds.get_handle(asset::RocketMove(owner.0)), &channel);
+
             let rocket = node
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite { custom_size: Some(Vec2::new(2.8, 1.4)), ..Default::default() },
@@ -613,9 +632,10 @@ pub fn fire_rockets(
                 .insert(parametric)
                 .insert(Offset(transform.translation.xy() - start))
                 .insert(Rocket)
-                .insert(Timer::new(Duration::from_secs_f64(ROCKET_TIME), false))
+                .insert(Timer::new(Duration::from_secs_f32(ROCKET_TIME), false))
                 .insert(Owner(player))
                 .insert(PrevPosition(transform.translation.xy()))
+                .insert(RocketChannel(channel))
                 .insert_bundle(RigidBodyBundle {
                     body_type: RigidBodyType::KinematicPositionBased.into(),
                     position: transform.translation.xy().extend(0.0).into(),
@@ -661,16 +681,28 @@ pub fn move_rockets(
             &mut Timer,
             Entity,
             &RigidBodyCollidersComponent,
+            &RocketChannel,
         ),
         With<Rocket>,
     >,
     mut commands: Commands,
     time: Res<Time>,
     mut buttons_enabled: ResMut<ButtonsEnabled>,
+    mut time_up_events: EventWriter<RocketTimeUp>,
+    audio: Res<Audio>,
+    game: Res<Game>,
 ) {
     let mut rockets_exist = false;
-    for (mut transform, mut body_position, offset, parametric, mut timer, entity, colliders) in
-        rockets.iter_mut()
+    for (
+        mut transform,
+        mut body_position,
+        offset,
+        parametric,
+        mut timer,
+        entity,
+        colliders,
+        channel,
+    ) in rockets.iter_mut()
     {
         // The colliders are missing for 1 frame, so skip that frame
         if colliders.0 .0.is_empty() {
@@ -681,6 +713,7 @@ pub fn move_rockets(
         timer.tick(time.delta());
         if timer.finished() {
             commands.entity(entity).despawn_recursive();
+            time_up_events.send(RocketTimeUp { rocket: entity });
         }
 
         let next_pos = parametric.eval(timer.percent() as f64) + offset.0;
@@ -692,10 +725,46 @@ pub fn move_rockets(
         transform.translation = next_pos.extend(z::ROCKET);
         body_position.0.next_position =
             Isometry::new(next_pos.into(), transform.rotation.to_axis_angle().1);
+
+        // Sound modulation
+        const MAX_VOLUME_SPEED: f32 = 15.0 / ROCKET_TIME;
+        const MAX_VOLUME: f32 = 3.0;
+        let scale = game.scale;
+        let speed = ((next_pos - curr_pos).length() / time.delta_seconds()).min(MAX_VOLUME_SPEED);
+        audio.set_panning_in_channel((next_pos.x - -scale) / (2.0 * scale), &channel.0);
+        audio.set_volume_in_channel(speed / MAX_VOLUME_SPEED * MAX_VOLUME, &channel.0);
     }
 
     if !rockets_exist {
         buttons_enabled.0 = true;
+    }
+}
+
+pub fn stop_rocket_sounds(
+    mut collisions: EventReader<RocketCollision>,
+    mut time_ups: EventReader<RocketTimeUp>,
+    audio: Res<Audio>,
+    channels: Query<&RocketChannel>,
+) {
+    let mut num_stopped_rockets = 0;
+
+    for collision in collisions.iter() {
+        for entity in [collision.rocket, collision.other] {
+            if let Ok(channel) = channels.get(entity) {
+                audio.stop_channel(&channel.0);
+                num_stopped_rockets += 1;
+            }
+        }
+    }
+
+    for time_up in time_ups.iter() {
+        if let Ok(channel) = channels.get(time_up.rocket) {
+            audio.stop_channel(&channel.0);
+        }
+    }
+
+    if num_stopped_rockets > 0 && num_stopped_rockets == channels.iter().len() {
+        audio.stop_channel(&AudioChannel::new("Fire".into()));
     }
 }
 

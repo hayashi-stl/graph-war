@@ -152,6 +152,7 @@ pub fn collect_balls(
                 tois[player_index as usize] = Some(toi);
                 tois[other_player_index as usize] = Some(toi);
                 rocket_collisions.send(RocketCollision { rocket, other: item });
+                audio.play(sounds.get_handle(asset::Explosion));
             }
         } else if live_rockets[player_index as usize] && items_reached.insert(item) {
             commands.entity(item).despawn_recursive();
@@ -171,6 +172,7 @@ pub fn collect_balls(
                 live_rockets[player_index as usize] = false;
                 tois[player_index as usize] = Some(toi);
                 rocket_collisions.send(RocketCollision { rocket, other: item });
+                audio.play(sounds.get_handle(asset::Explosion));
             }
         }
     }

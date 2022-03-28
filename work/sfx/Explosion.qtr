@@ -1,0 +1,374 @@
+<!DOCTYPE qtractorSession>
+<session name="Sound Effects" version="Qtractor 0.9.24.13git.93b59f">
+ <properties>
+  <directory>/home/joshua/rust/graph-war/work/sfx</directory>
+  <description></description>
+  <sample-rate>44100</sample-rate>
+  <tempo>200</tempo>
+  <ticks-per-beat>960</ticks-per-beat>
+  <beats-per-bar>4</beats-per-bar>
+  <beat-divisor>2</beat-divisor>
+ </properties>
+ <state>
+  <loop-start>0</loop-start>
+  <loop-end>0</loop-end>
+  <punch-in>0</punch-in>
+  <punch-out>0</punch-out>
+ </state>
+ <files>
+  <audio-list>
+   <file name="ball_pickup.ogg">../../assets/ball_pickup.ogg</file>
+   <file name="player_ball_pickup.ogg">../../assets/player_ball_pickup.ogg</file>
+  </audio-list>
+  <midi-list>
+   <file name="Sound_Effects-Track_1-1.mid">Sound_Effects-Track_1-1.mid</file>
+   <file name="Sound_Effects-Track_2-1.mid">Sound_Effects-Track_2-1.mid</file>
+  </midi-list>
+ </files>
+ <devices>
+  <audio-engine>
+   <audio-control>
+    <transport-mode>duplex</transport-mode>
+    <timebase>1</timebase>
+   </audio-control>
+   <audio-bus name="Master" mode="duplex">
+    <monitor>0</monitor>
+    <channels>2</channels>
+    <auto-connect>1</auto-connect>
+    <input-gain>1</input-gain>
+    <input-panning>0</input-panning>
+    <input-controllers/>
+    <input-plugins/>
+    <input-connects>
+     <connect index="0">
+      <client>system</client>
+      <port>capture_1</port>
+     </connect>
+     <connect index="1">
+      <client>system</client>
+      <port>capture_2</port>
+     </connect>
+    </input-connects>
+    <output-gain>1</output-gain>
+    <output-panning>0</output-panning>
+    <output-controllers/>
+    <output-plugins>
+     <plugin type="LV2">
+      <filename>http://calf.sourceforge.net/plugins/Limiter</filename>
+      <index>0</index>
+      <label>Calf_Limiter</label>
+      <preset></preset>
+      <direct-access-param>-1</direct-access-param>
+      <activated>1</activated>
+      <configs/>
+      <params>
+       <param index="19" name="ASC">1</param>
+       <param index="5" name="Input Gain">2.53854</param>
+       <param index="4" name="Bypass">0</param>
+       <param index="21" name="ASC Level">0.5</param>
+       <param index="6" name="Output Gain">1</param>
+       <param index="23" name="Auto-level">1</param>
+       <param index="22" name="Oversampling">1</param>
+       <param index="15" name="Limit">1</param>
+       <param index="17" name="Release">50</param>
+       <param index="16" name="Lookahead">5</param>
+      </params>
+      <controllers/>
+      <editor-pos>567,377</editor-pos>
+      <form-pos>0,0</form-pos>
+     </plugin>
+    </output-plugins>
+    <output-connects>
+     <connect index="0">
+      <client>system</client>
+      <port>playback_1</port>
+     </connect>
+     <connect index="1">
+      <client>system</client>
+      <port>playback_2</port>
+     </connect>
+    </output-connects>
+   </audio-bus>
+  </audio-engine>
+  <midi-engine>
+   <midi-control>
+    <mmc-mode>duplex</mmc-mode>
+    <mmc-device>127</mmc-device>
+    <spp-mode>duplex</spp-mode>
+    <clock-mode>none</clock-mode>
+   </midi-control>
+   <midi-bus name="Master" mode="duplex">
+    <monitor>0</monitor>
+    <input-gain>1</input-gain>
+    <input-panning>0</input-panning>
+    <input-controllers/>
+    <input-plugins>
+     <audio-output-bus>0</audio-output-bus>
+     <audio-output-auto-connect>1</audio-output-auto-connect>
+    </input-plugins>
+    <input-connects/>
+    <output-gain>1</output-gain>
+    <output-panning>0</output-panning>
+    <output-controllers/>
+    <output-plugins>
+     <audio-output-bus>0</audio-output-bus>
+     <audio-output-auto-connect>1</audio-output-auto-connect>
+    </output-plugins>
+    <output-connects/>
+    <midi-map>
+     <midi-patch channel="2">
+      <midi-bank-sel-method>0</midi-bank-sel-method>
+     </midi-patch>
+     <midi-patch channel="1">
+      <midi-bank-sel-method>0</midi-bank-sel-method>
+     </midi-patch>
+     <midi-patch channel="0">
+      <midi-bank-sel-method>0</midi-bank-sel-method>
+     </midi-patch>
+    </midi-map>
+   </midi-bus>
+  </midi-engine>
+ </devices>
+ <tracks>
+  <view>
+   <pixels-per-beat>32</pixels-per-beat>
+   <horizontal-zoom>640</horizontal-zoom>
+   <vertical-zoom>100</vertical-zoom>
+   <snap-per-beat>4</snap-per-beat>
+   <edit-head>0</edit-head>
+   <edit-tail>0</edit-tail>
+  </view>
+  <track type="midi" name="Ball Pickup">
+   <properties>
+    <input-bus>Master</input-bus>
+    <output-bus>Master</output-bus>
+    <midi-omni>0</midi-omni>
+    <midi-channel>0</midi-channel>
+    <midi-bank-sel-method>0</midi-bank-sel-method>
+    <midi-drums>0</midi-drums>
+   </properties>
+   <state>
+    <mute>0</mute>
+    <solo>0</solo>
+    <record>0</record>
+    <monitor>0</monitor>
+    <gain>1</gain>
+    <panning>0</panning>
+   </state>
+   <view>
+    <height>96</height>
+    <background-color>#ccffff</background-color>
+    <foreground-color>#667f7f</foreground-color>
+   </view>
+   <controllers/>
+   <clips>
+    <clip name="Sound_Effects-Track_1-1">
+     <properties>
+      <name>Sound_Effects-Track_1-1</name>
+      <start>0</start>
+      <offset>0</offset>
+      <length>20672</length>
+      <gain>1</gain>
+      <panning>0</panning>
+      <fade-in type="InQuad">0</fade-in>
+      <fade-out type="OutQuad">0</fade-out>
+     </properties>
+     <midi-clip>
+      <filename>Sound_Effects-Track_1-1.mid</filename>
+      <track-channel>1</track-channel>
+      <revision>14</revision>
+      <editor-pos>826,148</editor-pos>
+      <editor-size>900,895</editor-size>
+      <editor-horizontal-zoom>200</editor-horizontal-zoom>
+     </midi-clip>
+    </clip>
+   </clips>
+   <plugins>
+    <plugin type="LV2">
+     <filename>http://calf.sourceforge.net/plugins/Fluidsynth</filename>
+     <index>0</index>
+     <label>Calf_Fluidsynth</label>
+     <preset></preset>
+     <direct-access-param>-1</direct-access-param>
+     <activated>1</activated>
+     <configs>
+      <config type="urn:qtractor:state#type" key="urn:qtractor:state#key">
+       AAAD0XicjZJBT8IwGIbP269oOGu7boAwCUc9mRjjzRhSxjc2LW1tv5Lw7+22EA8I3elLm+d9
+       v+ZJV96q8getqFDb0qFAWKeJIMYBlq8WwiCPaSKPeSmMkS24d01WDaIpGauErKnT3lZQa7sH
+       qgCZkX7fKseepG937qSwWZ8bjLZIPtKkP7jTYaslmVSNtt5NOibptx6F9EA4zdLkk9xd8K1C
+       sEZLga1WF7H8WuwgXMhd8Bmd/c9bOILdXntWuO1dDcb68Koz2RkpgxG1q7XCNZmwRh+AfWnX
+       eMHOnu8zuqR5MSh6KzbPL9TV+bDrr8b09jffcNqEGbr4vFhMb1N5wLLbSBFHpnFkFkfmceQh
+       jiziyDKO8GycP85HdI2QzEdY5iM08xGe+SC6+5Y0TX8Bn+ov3g==</config>
+     </configs>
+     <params/>
+     <controllers/>
+     <editor-pos>629,306</editor-pos>
+     <form-pos>0,0</form-pos>
+    </plugin>
+    <plugin type="LV2">
+     <filename>http://calf.sourceforge.net/plugins/Reverb</filename>
+     <index>0</index>
+     <label>Calf_Reverb</label>
+     <preset></preset>
+     <direct-access-param>-1</direct-access-param>
+     <activated>1</activated>
+     <configs/>
+     <params>
+      <param index="18" name="Output Gain">1</param>
+      <param index="7" name="Decay time">3.5798</param>
+      <param index="9" name="Room size">2</param>
+      <param index="8" name="High Frq Damp">5000</param>
+      <param index="11" name="Wet Amount">0.25</param>
+      <param index="10" name="Diffusion">0.5</param>
+      <param index="13" name="Pre Delay">0</param>
+      <param index="12" name="Dry Amount">1</param>
+      <param index="15" name="Treble Cut">5000</param>
+      <param index="14" name="Bass Cut">300</param>
+      <param index="17" name="Input Gain">1</param>
+      <param index="16" name="Active">1</param>
+     </params>
+     <controllers/>
+     <editor-pos>603,398</editor-pos>
+     <form-pos>0,0</form-pos>
+    </plugin>
+    <audio-output-bus>0</audio-output-bus>
+    <audio-output-auto-connect>1</audio-output-auto-connect>
+   </plugins>
+  </track>
+  <track type="midi" name="Track 2">
+   <properties>
+    <input-bus>Master</input-bus>
+    <output-bus>Master</output-bus>
+    <midi-omni>0</midi-omni>
+    <midi-channel>1</midi-channel>
+    <midi-bank-sel-method>0</midi-bank-sel-method>
+    <midi-drums>0</midi-drums>
+   </properties>
+   <state>
+    <mute>0</mute>
+    <solo>0</solo>
+    <record>0</record>
+    <monitor>0</monitor>
+    <gain>1</gain>
+    <panning>0</panning>
+   </state>
+   <view>
+    <height>96</height>
+    <background-color>#99ffff</background-color>
+    <foreground-color>#4c7f7f</foreground-color>
+   </view>
+   <controllers/>
+   <curve-file/>
+   <clips>
+    <clip name="Sound_Effects-Track_2-1">
+     <properties>
+      <name>Sound_Effects-Track_2-1</name>
+      <start>0</start>
+      <offset>0</offset>
+      <length>19845</length>
+      <gain>1</gain>
+      <panning>0</panning>
+      <fade-in type="InQuad">0</fade-in>
+      <fade-out type="OutQuad">0</fade-out>
+     </properties>
+     <midi-clip>
+      <filename>Sound_Effects-Track_2-1.mid</filename>
+      <track-channel>1</track-channel>
+      <revision>5</revision>
+      <editor-pos>546,198</editor-pos>
+      <editor-horizontal-zoom>200</editor-horizontal-zoom>
+     </midi-clip>
+    </clip>
+   </clips>
+   <plugins>
+    <plugin type="LV2">
+     <filename>http://calf.sourceforge.net/plugins/Fluidsynth</filename>
+     <index>0</index>
+     <label>Calf_Fluidsynth</label>
+     <preset></preset>
+     <direct-access-param>-1</direct-access-param>
+     <activated>1</activated>
+     <configs>
+      <config type="urn:qtractor:state#type" key="urn:qtractor:state#key">
+       AAADznicjZJPT4MwGIfP8CkaztpSGHNDsqOeTIzxZszSsZeBdm3tnyV8ewtk8TC3cnrT5vn9
+       3uZJK6dF+WM1q63UpbHMwiaOGFIGbPmqwQ/0GEf8lJVMKd6BeZeoaq1VJSE14w020ukaGqkP
+       gAVYorg7dMKQJ+66vemFbTfnBiW1RR9xNB5Mf9xJjpK6ldqZZGCiceuJcQeI4jSOPtHdBd8J
+       C1pJzmwnxUUsuxY7MuNzF3yKi/95DSfQu2vP8rejq8nYGK4Gk4OR0hsR+0YKu0EJaeURyJc0
+       rWPk7Pk+xWuc5ZOit3z7/IJNk027/mrUaH/7Df3WT9+V3iYyjxTFbSYP1yzCSBFGlmHkIYys
+       wsg6jNDUM3SZrxYBjs7oymYwMyzTGZrpDM90Ej38SRzHv8CdL0I=</config>
+     </configs>
+     <params/>
+     <controllers/>
+     <curve-file/>
+     <editor-pos>629,306</editor-pos>
+     <form-pos>0,0</form-pos>
+    </plugin>
+    <plugin type="LV2">
+     <filename>http://calf.sourceforge.net/plugins/MultiChorus</filename>
+     <index>0</index>
+     <label>Calf_Multi_Chorus</label>
+     <preset></preset>
+     <direct-access-param>-1</direct-access-param>
+     <activated>1</activated>
+     <configs/>
+     <params>
+      <param index="5" name="Mod Depth">6</param>
+      <param index="18" name="Output Gain">1</param>
+      <param index="4" name="Min Delay">5</param>
+      <param index="7" name="Stereo Phase">180</param>
+      <param index="6" name="Mod Rate">0.1</param>
+      <param index="9" name="Inter-Voice Phase">64</param>
+      <param index="8" name="Voices">6</param>
+      <param index="11" name="Dry Amount">0.5</param>
+      <param index="10" name="Amount">0.5</param>
+      <param index="27" name="LFO">1</param>
+      <param index="13" name="Center Frq 2">5000</param>
+      <param index="12" name="Center Frq 1">100</param>
+      <param index="15" name="Overlap">0.718</param>
+      <param index="14" name="Q">0.125</param>
+      <param index="17" name="Input Gain">1</param>
+      <param index="16" name="Active">1</param>
+     </params>
+     <controllers/>
+     <curve-file/>
+     <editor-pos>670,431</editor-pos>
+     <form-pos>0,0</form-pos>
+    </plugin>
+    <plugin type="LADSPA">
+     <filename>/usr/lib/ladspa/amp.so</filename>
+     <index>1</index>
+     <label>amp_stereo</label>
+     <preset></preset>
+     <direct-access-param>-1</direct-access-param>
+     <activated>1</activated>
+     <configs/>
+     <params>
+      <param index="0" name="Gain">0</param>
+     </params>
+     <controllers/>
+     <curve-file>
+      <curve-items>
+       <curve-item index="0" name="Gain" mode="Linear">
+        <type>NONREGPARAM</type>
+        <channel>0</channel>
+        <param>0</param>
+        <mode>Linear</mode>
+        <process>1</process>
+        <capture>0</capture>
+        <locked>0</locked>
+        <logarithmic>1</logarithmic>
+        <color>#800000</color>
+       </curve-item>
+      </curve-items>
+      <filename>Sound_Effects-Track_2_amp_stereo_419_curve-1.mid</filename>
+     </curve-file>
+     <editor-pos>0,0</editor-pos>
+     <form-pos>756,417</form-pos>
+    </plugin>
+    <audio-output-bus>0</audio-output-bus>
+    <audio-output-auto-connect>1</audio-output-auto-connect>
+   </plugins>
+  </track>
+ </tracks>
+</session>
+

@@ -1,0 +1,67 @@
+<!DOCTYPE qtractorPluginList>
+<plugin-list version="Qtractor 0.9.24.13git.93b59f">
+ <plugin type="LV2">
+  <filename>http://calf.sourceforge.net/plugins/Monosynth</filename>
+  <index>0</index>
+  <label>Calf_Monosynth</label>
+  <preset>Fat Bass</preset>
+  <direct-access-param>-1</direct-access-param>
+  <activated>1</activated>
+  <configs>
+   <config key="urn:qtractor:state#key" type="urn:qtractor:state#type">
+       AAASDnicnZbNjtsgEIDPyVNYOa8cg39xV/sGrXroraosNsGJVWy8gPPz9sWuVj0YzFBfoljz
+       MR/DgHmd5FB/aElPWshaaarZ235Ho1ExXX+XzPxEX/Y7fsM1HUfeMfVDRK9Xrcf6eDxR3sZK
+       TPLEWiEvLB6YPo58unSDOn4Vg1DPQV/fPgcYhdTRz/1u+aOe/bvg0YGelcQNPcxBuyXrjfKJ
+       RShO9rtf0YsL6MdQ5DRp0bYrKtmmzus0iQcJziFXQO4jmLIkSZPlQVukjcvdQOjK2OqF85gQ
+       REhRlhtgYNWCi2afeZoghFwVc3QMQkVMioSQKs/sIBtu2NahTsEZcGVLKnfDzZytF5xr1HZc
+       s3XpPPGNYgGT+c2eTSs4F3d4Hs4uVAt4Dt4K1GjZXYIQs50Zp0/4FlgYaQ7FdbNtpgk3cyzM
+       JjN2+nQNOZ8WaL0qW/HOimWE4Mp52MyktW6ZOQvmJ8d2sKfKXgdclajM8sqBdecOPq/+fuXY
+       KML7U6C5d/Q0rGdUmlIkBUlw6kb77gFvOtPZIYtkwpWWzNoKG8yd3tZzSbeAbjhbtvSW12MU
+       ap3ETeCwieNmGjolhv9AWvmxovAGFVgtHDr18Z0NZ7Njhssawu4NPV6pYk0vzmvKufbzNYz2
+       bLAct07G9o1xlkuZeyFz7RZnihvjYd/MGXCemsvWMm+XG+3fe+0ywOt8353vrbUpWtNTc1A/
+       6uQleYsO38SnriMImaAkjtFmEIaMlJqg7WEy/zAIYo0g1ghijbzWCGKNIdYYYo0h1thrjSHW
+       KcQ6hVinEOvUa51CrDOIdQaxziDWmdc6g1jnEOscYp1DrHOvdQ6xLiDWBcS6gFgXXusCYl1C
+       rEuIdQmxLr3WJcS6glhXEOsKYl15rSuINYFYE4g1gVgTrzX5Zz1/LeP9/g8RhjHD</config>
+  </configs>
+  <params/>
+ </plugin>
+ <plugin type="LV2">
+  <filename>http://calf.sourceforge.net/plugins/RingModulator</filename>
+  <index>0</index>
+  <label>Calf_Ring_Modulator</label>
+  <preset></preset>
+  <direct-access-param>-1</direct-access-param>
+  <activated>1</activated>
+  <configs/>
+  <params>
+   <param index="27" name="Mod Detune LO">-100</param>
+   <param index="28" name="Mod Detune HI">100</param>
+   <param index="29" name="Mod Detune Active">1</param>
+   <param index="31" name="LFO 2">0</param>
+   <param index="4" name="Bypass">0</param>
+   <param index="5" name="Input Gain">1</param>
+   <param index="32" name="LFO 2 Freq">0.2</param>
+   <param index="6" name="Output Gain">1</param>
+   <param index="33" name="Reset 2">0</param>
+   <param index="34" name="LFO Freq LO">0.05</param>
+   <param index="35" name="LFO Freq HI">0.5</param>
+   <param index="36" name="LFO 1 Freq Active">0</param>
+   <param index="37" name="Mod Amount LO">0.3</param>
+   <param index="38" name="Mod Amount HI">0.6</param>
+   <param index="39" name="Mod Amount Active">0</param>
+   <param index="15" name="Modulator">2</param>
+   <param index="16" name="Mod Freq">2.4</param>
+   <param index="17" name="Mod Amount">0.508</param>
+   <param index="18" name="Mod Phase">0</param>
+   <param index="19" name="Mod Detune">0</param>
+   <param index="20" name="Listen">0</param>
+   <param index="21" name="LFO 1">0</param>
+   <param index="22" name="LFO 1 Freq">1.45881</param>
+   <param index="23" name="Reset 1">0</param>
+   <param index="24" name="Mod Freq LO">100</param>
+   <param index="25" name="Mod Freq HI">10000</param>
+   <param index="26" name="Mod Freq Active">0</param>
+  </params>
+ </plugin>
+</plugin-list>
+
